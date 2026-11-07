@@ -1,0 +1,42 @@
+import 'package:flutter/material.dart';
+
+class LucideIcons {
+  static const IconData plus = Icons.add_rounded;
+  static const IconData plusCircle = Icons.add_circle_outline_rounded;
+  static const IconData lock = Icons.lock_rounded;
+  static const IconData unlock = Icons.lock_open_rounded;
+  static const IconData repeat = Icons.repeat_rounded;
+  static const IconData database = Icons.storage_rounded;
+  static const IconData fileSpreadsheet = Icons.table_chart_outlined;
+  static const IconData pieChart = Icons.pie_chart_outline_rounded;
+  static const IconData layoutGrid = Icons.grid_view_rounded;
+  static const IconData user = Icons.person_outline_rounded;
+  static const IconData userCheck = Icons.how_to_reg_rounded;
+  static const IconData users = Icons.groups_outlined;
+  static const IconData mapPin = Icons.place_outlined;
+  static const IconData bookOpen = Icons.menu_book_rounded;
+  static const IconData download = Icons.download_rounded;
+  static const IconData globe = Icons.public_rounded;
+  static const IconData info = Icons.info_outline_rounded;
+  static const IconData search = Icons.search_rounded;
+  static const IconData calendar = Icons.calendar_today_rounded;
+  static const IconData x = Icons.close_rounded;
+  static const IconData edit3 = Icons.edit_note_rounded;
+  static const IconData alertTriangle = Icons.warning_amber_rounded;
+  static const IconData bell = Icons.notifications_outlined;
+  static const IconData clock = Icons.schedule_rounded;
+  static const IconData rotateCcw = Icons.rotate_left_rounded;
+  static const IconData rotateCw = Icons.rotate_right_rounded;
+  static const IconData sliders = Icons.tune_rounded;
+  static const IconData chevronLeft = Icons.chevron_left_rounded;
+  static const IconData chevronRight = Icons.chevron_right_rounded;
+  static const IconData chevronDown = Icons.keyboard_arrow_down_rounded;
+  static const IconData layers = Icons.layers_rounded;
+  static const IconData refreshCw = Icons.autorenew_rounded;
+  static const IconData checkCircle = Icons.check_circle_rounded;
+  static const IconData fileText = Icons.description_outlined;
+  static const IconData activity = Icons.monitor_heart_outlined;
+  static const IconData xCircle = Icons.cancel_rounded;
+  static const IconData check = Icons.check_rounded;
+  static const IconData zap = Icons.bolt_rounded;
+}
