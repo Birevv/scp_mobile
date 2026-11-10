@@ -302,56 +302,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showServerUrlDialog() {
-    final urlCtrl =
-        TextEditingController(text: widget.state.apiService.baseUrl);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Konfigurasi Endpoint Server', style: AppTypography.sectionTitle),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Alamat REST API Server SCP SMK Negeri 1 Bantul:',
-              style: AppTypography.caption,
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: urlCtrl,
-              decoration: const InputDecoration(
-                hintText: 'http://10.0.2.2:8000/api',
-                prefixIcon: Icon(Icons.dns_outlined, size: 18),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primaryIndigo,
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () async {
-              final next = urlCtrl.text.trim();
-              if (next.isNotEmpty) {
-                await widget.state.updateServerBaseUrl(next);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -368,62 +318,42 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   // 1. Header Identitas (Notion-style: Minimal, Ringkas, Elegan)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
+                      Image.asset(
+                        'assets/images/SMK_Negeri_1_Bantul_logo.png',
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.contain,
+                      ),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Row(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            Image.asset(
-                              'assets/images/SMK_Negeri_1_Bantul_logo.png',
-                              width: 36,
-                              height: 36,
-                              fit: BoxFit.contain,
+                            Text(
+                              'School Class Progress App',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.cardTitle.copyWith(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF172033),
+                                letterSpacing: -0.2,
+                              ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    'School Class Progress',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.cardTitle.copyWith(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w700,
-                                      color: const Color(0xFF172033),
-                                      letterSpacing: -0.2,
-                                    ),
-                                  ),
-                                  Text(
-                                    'SMK Negeri 1 Bantul',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: AppTypography.caption.copyWith(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                      color: const Color(0xFF64748B),
-                                    ),
-                                  ),
-                                ],
+                            Text(
+                              'SMK Negeri 1 Bantul',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: AppTypography.caption.copyWith(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w500,
+                                color: const Color(0xFF64748B),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      IconButton(
-                        tooltip: 'Pengaturan Server API',
-                        onPressed: _showServerUrlDialog,
-                        icon: const Icon(
-                          Icons.tune_rounded,
-                          color: Color(0xFF64748B),
-                          size: 20,
-                        ),
-                        splashRadius: 20,
-                        visualDensity: VisualDensity.compact,
                       ),
                     ],
                   ),
@@ -837,7 +767,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                               const SizedBox(height: 3),
                               Text(
-                                'Apabila mengalami kendala akses akun atau perubahan data NISN/NIP, silakan hubungi Administrator Sistem SCP atau Unit TIK SMK Negeri 1 Bantul.',
+                                'Apabila mengalami kendala akses akun atau perubahan data NISN/NIP, silakan hubungi Administrator Sistem SCP.',
                                 style: AppTypography.caption.copyWith(
                                   color: const Color(0xFF64748B),
                                   fontSize: 11.5,

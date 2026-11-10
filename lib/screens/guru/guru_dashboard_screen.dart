@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_typography.dart';
 import '../../constants/app_spacing.dart';
@@ -6,6 +7,7 @@ import '../../state/app_state.dart';
 import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/cards/soft_card.dart';
 import '../../widgets/cards/data_state_view.dart';
+import '../../widgets/cards/today_info_card.dart';
 import '../../widgets/menu_grid.dart';
 
 class GuruDashboardScreen extends StatelessWidget {
@@ -72,7 +74,20 @@ class GuruDashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
-                  // 2. CARD INFORMASI JADWAL MENGAJAR
+
+                    // INFORMASI HARI INI & KALENDER
+                    TodayInfoCard(
+                      formattedDate: state.currentDateLabel,
+                      todayEvent: state.todayEvent,
+                      activeCycle: state.activeCycle,
+                      calendarEvents: state.calendarEvents,
+                      upcomingEvent: state.upcomingEvent,
+                      onTapCalendarStatus: () => onNavigate('academic_calendar'),
+                    ),
+
+                    const SizedBox(height: AppSpacing.lg),
+
+                    // 2. CARD INFORMASI JADWAL MENGAJAR
                   SoftCard(
                     padding: const EdgeInsets.all(AppSpacing.lg),
                     borderRadius: AppSpacing.radiusLarge,
@@ -299,8 +314,8 @@ class GuruDashboardScreen extends StatelessWidget {
                       MenuItemData(
                         label: 'Jadwal Mengajar',
                         icon: Icons.calendar_month_rounded,
-                        iconColor: AppColors.primaryIndigo,
-                        bgColor: AppColors.lightIndigoBg,
+                        iconColor: AppColors.brandPrimary,
+                        bgColor: AppColors.brandAccent,
                         onTap: () => onNavigate('guru_my_schedule'),
                       ),
                       MenuItemData(
@@ -314,8 +329,8 @@ class GuruDashboardScreen extends StatelessWidget {
                       MenuItemData(
                         label: 'Riwayat Jurnal',
                         icon: Icons.history_edu_rounded,
-                        iconColor: AppColors.primaryIndigo,
-                        bgColor: AppColors.lightIndigoBg,
+                        iconColor: AppColors.brandPrimary,
+                        bgColor: AppColors.brandAccent,
                         onTap: () => onNavigate('guru_journal_history'),
                       ),
                       MenuItemData(
@@ -329,6 +344,13 @@ class GuruDashboardScreen extends StatelessWidget {
                         onTap: state.isScheduleLocked
                             ? null
                             : () => onNavigate('guru_schedule_input'),
+                      ),
+                      MenuItemData(
+                        label: 'Kalender',
+                        icon: Icons.date_range_rounded,
+                        iconColor: AppColors.brandNavy,
+                        bgColor: AppColors.brandAccent,
+                        onTap: () => onNavigate('academic_calendar'),
                       ),
                     ],
                   ),
@@ -381,20 +403,62 @@ class GuruDashboardScreen extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () => onNavigate('guru_my_schedule'),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: const Size(0, 32),
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(
-                          'Semua Jadwal ›',
-                          style: AppTypography.smallHint.copyWith(
-                            color: AppColors.primaryIndigo,
-                            fontWeight: FontWeight.w700,
+                      Row(
+                        children: [
+                          InkWell(
+                            onTap: () => state.triggerTestClassEndingNotification(
+                              context: context,
+                              onNavigateToJournal: () => onNavigate('guru_journal_input'),
+                              onNavigateToSchedule: () => onNavigate('guru_my_schedule'),
+                            ),
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandAccent,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.notifications_active_rounded,
+                                    size: 12,
+                                    color: AppColors.brandPrimary,
+                                  ),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    'Uji Notif',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandPrimary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-                        ),
+                          const SizedBox(width: 4),
+                          TextButton(
+                            onPressed: () => onNavigate('guru_my_schedule'),
+                            style: TextButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              minimumSize: const Size(0, 32),
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              'Semua Jadwal ›',
+                              style: AppTypography.smallHint.copyWith(
+                                color: AppColors.primaryIndigo,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),

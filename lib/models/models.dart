@@ -155,6 +155,8 @@ class AcademicEventInfo {
   final String? startDate;
   final String? endDate;
   final String? description;
+  final bool isConfigured;
+  final String? statusLabel;
 
   const AcademicEventInfo({
     this.id = 0,
@@ -167,21 +169,38 @@ class AcademicEventInfo {
     this.startDate,
     this.endDate,
     this.description,
+    this.isConfigured = false,
+    this.statusLabel,
   });
+
+  factory AcademicEventInfo.unconfigured() {
+    return const AcademicEventInfo(
+      title: 'Informasi kalender belum tersedia.',
+      category: 'unconfigured',
+      categoryLabel: 'Kalender Akademik',
+      isHoliday: false,
+      disableKbm: false,
+      requiresAttendance: false,
+      isConfigured: false,
+      statusLabel: 'Belum Dikonfigurasi',
+    );
+  }
 
   factory AcademicEventInfo.fromJson(Map<String, dynamic> json) {
     return AcademicEventInfo(
       id: (json['id'] as num?)?.toInt() ?? 0,
-      title: (json['title'] ?? 'Hari Sekolah Efektif').toString(),
-      category: (json['category'] ?? 'kbm').toString(),
+      title: (json['title'] ?? 'Informasi kalender belum tersedia.').toString(),
+      category: (json['category'] ?? 'kegiatan').toString(),
       categoryLabel:
-          (json['category_label'] ?? 'Kegiatan Belajar Mengajar').toString(),
+          (json['category_label'] ?? 'Agenda Akademik').toString(),
       isHoliday: json['is_holiday'] == true,
       disableKbm: json['disable_kbm'] == true,
       requiresAttendance: json['requires_attendance'] != false,
       startDate: json['start_date']?.toString(),
       endDate: json['end_date']?.toString(),
       description: json['description']?.toString(),
+      isConfigured: json['is_configured'] != false,
+      statusLabel: json['status_label']?.toString(),
     );
   }
 }
@@ -210,7 +229,7 @@ class StudentAttendanceSummary {
   final int izin;
   final int alpa;
   final int total;
-  final double percentage;
+  final double? percentage;
 
   const StudentAttendanceSummary({
     this.month = '',
@@ -219,18 +238,22 @@ class StudentAttendanceSummary {
     this.izin = 0,
     this.alpa = 0,
     this.total = 0,
-    this.percentage = 0.0,
+    this.percentage,
   });
 
+  bool get hasData => total > 0;
+
   factory StudentAttendanceSummary.fromJson(Map<String, dynamic> json) {
+    final int tot = (json['total'] as num?)?.toInt() ?? 0;
+    final num? pctNum = json['percentage'] as num?;
     return StudentAttendanceSummary(
       month: (json['month'] ?? '').toString(),
       hadir: (json['hadir'] as num?)?.toInt() ?? 0,
       sakit: (json['sakit'] as num?)?.toInt() ?? 0,
       izin: (json['izin'] as num?)?.toInt() ?? 0,
       alpa: (json['alpa'] as num?)?.toInt() ?? 0,
-      total: (json['total'] as num?)?.toInt() ?? 0,
-      percentage: (json['percentage'] as num?)?.toDouble() ?? 0.0,
+      total: tot,
+      percentage: tot > 0 ? (pctNum?.toDouble() ?? 0.0) : null,
     );
   }
 }
@@ -273,6 +296,58 @@ class HomeroomAttendanceSummary {
           (att['percentage'] as num? ?? att['precentage'] as num?)?.toDouble() ??
               0.0,
       pendingCount: (json['pending_count'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class HomeroomStudent {
+  final String id;
+  final String name;
+  final String nisn;
+  final String className;
+  final int hadir;
+  final int sakit;
+  final int izin;
+  final int alpa;
+  final int total;
+  final double? percentage;
+  final AttendanceStatus todayStatus;
+  final bool isAutoSynced;
+  final String? leaveReason;
+
+  const HomeroomStudent({
+    required this.id,
+    required this.name,
+    required this.nisn,
+    required this.className,
+    this.hadir = 0,
+    this.sakit = 0,
+    this.izin = 0,
+    this.alpa = 0,
+    this.total = 0,
+    this.percentage,
+    this.todayStatus = AttendanceStatus.hadir,
+    this.isAutoSynced = false,
+    this.leaveReason,
+  });
+
+  factory HomeroomStudent.fromJson(Map<String, dynamic> json) {
+    final int tot = (json['total'] as num?)?.toInt() ?? 0;
+    final num? pct = json['percentage'] as num? ?? json['precentage'] as num?;
+    return HomeroomStudent(
+      id: (json['id'] ?? '').toString(),
+      name: (json['student_name'] ?? json['full_name'] ?? '-').toString(),
+      nisn: (json['identity_number'] ?? json['nisn'] ?? '-').toString(),
+      className: (json['classroom_name'] ?? '-').toString(),
+      hadir: (json['hadir'] as num?)?.toInt() ?? 0,
+      sakit: (json['sakit'] as num?)?.toInt() ?? 0,
+      izin: (json['izin'] as num?)?.toInt() ?? 0,
+      alpa: (json['alpa'] as num?)?.toInt() ?? 0,
+      total: tot,
+      percentage: tot > 0 ? (pct?.toDouble() ?? 0.0) : null,
+      todayStatus: AttendanceStatus.fromString(json['today_status']?.toString()),
+      isAutoSynced: json['is_auto_synced'] == true,
+      leaveReason: json['leave_reason']?.toString(),
     );
   }
 }
@@ -712,7 +787,7 @@ class DelayedJournalAlert {
     this.className = '-',
     this.roomName = '-',
     this.timeSlot = '',
-    this.minutesLate = 45,
+    this.minutesLate = 30,
     required this.message,
   });
 
@@ -723,7 +798,7 @@ class DelayedJournalAlert {
       className: (json['classroom_name'] ?? '-').toString(),
       roomName: (json['room_name'] ?? '-').toString(),
       timeSlot: (json['time_slot'] ?? '').toString(),
-      minutesLate: (json['minutes_late'] as num?)?.toInt() ?? 45,
+      minutesLate: (json['minutes_late'] as num?)?.toInt() ?? 30,
       message: (json['message'] ?? 'Jurnal mengajar belum diisi').toString(),
     );
   }

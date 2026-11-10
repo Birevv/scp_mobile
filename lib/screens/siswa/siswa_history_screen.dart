@@ -4,19 +4,19 @@ import '../../constants/app_typography.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/models.dart';
 import '../../state/app_state.dart';
-import '../../widgets/headers/header_with_gradient.dart';
+import '../../widgets/headers/scp_page_header.dart';
 import '../../widgets/cards/soft_card.dart';
 import '../../widgets/cards/data_state_view.dart';
 import '../../widgets/buttons/pill_button.dart';
 
 class SiswaHistoryScreen extends StatefulWidget {
   final AppState state;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   const SiswaHistoryScreen({
     super.key,
     required this.state,
-    required this.onBack,
+    this.onBack,
   });
 
   @override
@@ -28,6 +28,7 @@ class _SiswaHistoryScreenState extends State<SiswaHistoryScreen> {
   String _selectedFilterStatus = 'Semua';
 
   final List<String> _months = [
+    'November 2026',
     'Oktober 2026',
     'September 2026',
     'Agustus 2026',
@@ -35,6 +36,39 @@ class _SiswaHistoryScreenState extends State<SiswaHistoryScreen> {
   ];
 
   final List<String> _filterStatuses = ['Semua', 'Hadir', 'Izin', 'Sakit', 'Alpa'];
+
+  int? _parseMonth(String monthStr) {
+    final lower = monthStr.toLowerCase();
+    if (lower.contains('januari')) return 1;
+    if (lower.contains('februari')) return 2;
+    if (lower.contains('maret')) return 3;
+    if (lower.contains('april')) return 4;
+    if (lower.contains('mei')) return 5;
+    if (lower.contains('juni')) return 6;
+    if (lower.contains('juli')) return 7;
+    if (lower.contains('agustus')) return 8;
+    if (lower.contains('september')) return 9;
+    if (lower.contains('oktober')) return 10;
+    if (lower.contains('november')) return 11;
+    if (lower.contains('desember')) return 12;
+    return null;
+  }
+
+  int? _parseYear(String monthStr) {
+    final parts = monthStr.split(' ');
+    if (parts.length >= 2) {
+      return int.tryParse(parts.last);
+    }
+    return null;
+  }
+
+  void _onMonthChanged(String? val) {
+    if (val == null || val == _selectedMonth) return;
+    setState(() => _selectedMonth = val);
+    final month = _parseMonth(val);
+    final year = _parseYear(val);
+    widget.state.fetchStudentHistoryData(month: month, year: year);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -55,20 +89,28 @@ class _SiswaHistoryScreenState extends State<SiswaHistoryScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // Header with Gradient
-          HeaderWithGradient(
-            userName: 'Riwayat Kehadiran',
-            userSubtitle: '${user.name} • ${user.className}',
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: widget.onBack,
-            ),
+          // Standardized SCP Page Header
+          ScpPageHeader(
+            title: 'Riwayat Kehadiran',
+            studentName: user.name,
+            className: user.className,
+            cycleLabel: null,
+            showCycleBadge: false,
+            leading: widget.onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: widget.onBack,
+                  )
+                : null,
           ),
 
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primaryIndigo,
-              onRefresh: () => widget.state.fetchStudentHistoryData(),
+              onRefresh: () => widget.state.fetchStudentHistoryData(
+                month: _parseMonth(_selectedMonth),
+                year: _parseYear(_selectedMonth),
+              ),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -79,7 +121,10 @@ class _SiswaHistoryScreenState extends State<SiswaHistoryScreen> {
                       DataErrorCard(
                         title: 'Gagal Memuat Riwayat',
                         message: widget.state.historyError!,
-                        onRetry: () => widget.state.fetchStudentHistoryData(),
+                        onRetry: () => widget.state.fetchStudentHistoryData(
+                          month: _parseMonth(_selectedMonth),
+                          year: _parseYear(_selectedMonth),
+                        ),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
@@ -108,9 +153,7 @@ class _SiswaHistoryScreenState extends State<SiswaHistoryScreen> {
                                         child: Text(m, style: AppTypography.bodyText),
                                       ))
                                   .toList(),
-                              onChanged: (val) {
-                                if (val != null) setState(() => _selectedMonth = val);
-                              },
+                              onChanged: _onMonthChanged,
                             ),
                           ),
                         ),

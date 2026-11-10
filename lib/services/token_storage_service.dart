@@ -6,14 +6,11 @@ abstract class TokenStorage {
   Future<void> deleteToken();
   Future<String?> readSavedUsername();
   Future<void> saveUsername(String? username);
-  Future<String?> readBaseUrl();
-  Future<void> saveBaseUrl(String url);
 }
 
 class SecureTokenStorage implements TokenStorage {
   static const String _tokenKey = 'scp_auth_token';
   static const String _usernameKey = 'scp_saved_username';
-  static const String _baseUrlKey = 'scp_api_base_url';
 
   final FlutterSecureStorage _storage;
 
@@ -63,28 +60,11 @@ class SecureTokenStorage implements TokenStorage {
       }
     } catch (_) {}
   }
-
-  @override
-  Future<String?> readBaseUrl() async {
-    try {
-      return await _storage.read(key: _baseUrlKey);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  @override
-  Future<void> saveBaseUrl(String url) async {
-    try {
-      await _storage.write(key: _baseUrlKey, value: url);
-    } catch (_) {}
-  }
 }
 
 class MemoryTokenStorage implements TokenStorage {
   String? _token;
   String? _username;
-  String? _baseUrl;
 
   MemoryTokenStorage({String? initialToken}) : _token = initialToken;
 
@@ -107,14 +87,6 @@ class MemoryTokenStorage implements TokenStorage {
   @override
   Future<void> saveUsername(String? username) async {
     _username = username;
-  }
-
-  @override
-  Future<String?> readBaseUrl() async => _baseUrl;
-
-  @override
-  Future<void> saveBaseUrl(String url) async {
-    _baseUrl = url;
   }
 }
 

@@ -31,7 +31,10 @@ class AppBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (items.isEmpty) return const SizedBox.shrink();
+
     final bottomInset = MediaQuery.of(context).padding.bottom;
+    final int safeIndex = currentIndex.clamp(0, items.length - 1);
 
     return Container(
       decoration: BoxDecoration(
@@ -48,120 +51,135 @@ class AppBottomNavBar extends StatelessWidget {
         ],
       ),
       padding: EdgeInsets.only(
-        top: 6,
+        top: 0,
         bottom: bottomInset > 0 ? bottomInset + 4 : 8,
-        left: 6,
-        right: 6,
+        left: 4,
+        right: 4,
       ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: items.asMap().entries.map((entry) {
-          final int index = entry.key;
-          final AppBottomNavItem item = entry.value;
-          final bool isSelected = index == currentIndex;
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final double itemWidth = constraints.maxWidth / items.length;
+          final double indicatorWidth = 24.0;
+          final double indicatorLeft =
+              (safeIndex * itemWidth) + (itemWidth - indicatorWidth) / 2;
 
-          return Expanded(
-            child: InkWell(
-              onTap: () => onIndexChanged(index),
-              borderRadius: BorderRadius.circular(14),
-              splashColor: AppColors.lightIndigoBorder.withValues(alpha: 0.3),
-              highlightColor: Colors.transparent,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Top Active Indicator Pill
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
-                      width: isSelected ? 22 : 0,
-                      height: 3,
-                      margin: const EdgeInsets.only(bottom: 4),
-                      decoration: BoxDecoration(
-                        color: isSelected
-                            ? AppColors.primaryIndigo
-                            : Colors.transparent,
-                        borderRadius:
-                            BorderRadius.circular(AppSpacing.radiusPill),
-                      ),
-                    ),
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        AnimatedContainer(
-                          duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? AppColors.lightIndigoBg
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            isSelected
-                                ? (item.activeIcon ?? item.icon)
-                                : item.icon,
-                            size: 22,
-                            color: isSelected
-                                ? AppColors.primaryIndigo
-                                : AppColors.textSecondary,
-                          ),
-                        ),
-                        if (item.badge != null)
-                          Positioned(
-                            top: -2,
-                            right: 4,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.errorAlpa,
-                                borderRadius: BorderRadius.circular(
-                                  AppSpacing.radiusPill,
-                                ),
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Text(
-                                item.badge!,
-                                style: AppTypography.microBadge.copyWith(
-                                  color: Colors.white,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      item.label,
-                      style: AppTypography.microBadge.copyWith(
-                        color: isSelected
-                            ? AppColors.primaryIndigo
-                            : AppColors.textSecondary,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.w500,
-                        fontSize: 11,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
+          return Stack(
+            children: [
+              // Single Smooth Sliding Top Indicator
+              // Menjamin hanya ada 1 indikator aktif tanpa artefak ghosting atau titik sisa
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                left: indicatorLeft,
+                top: 0,
+                width: indicatorWidth,
+                height: 3,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryIndigo,
+                    borderRadius: BorderRadius.circular(AppSpacing.radiusPill),
+                  ),
                 ),
               ),
-            ),
+
+              // Navigation Items Row
+              Padding(
+                padding: const EdgeInsets.only(top: 7),
+                child: Row(
+                  children: items.asMap().entries.map((entry) {
+                    final int index = entry.key;
+                    final AppBottomNavItem item = entry.value;
+                    final bool isSelected = index == safeIndex;
+
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () => onIndexChanged(index),
+                        borderRadius: BorderRadius.circular(12),
+                        splashColor:
+                            AppColors.primaryIndigo.withValues(alpha: 0.08),
+                        highlightColor: Colors.transparent,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Stack(
+                                clipBehavior: Clip.none,
+                                alignment: Alignment.center,
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 3,
+                                    ),
+                                    child: Icon(
+                                      isSelected
+                                          ? (item.activeIcon ?? item.icon)
+                                          : item.icon,
+                                      size: 23,
+                                      color: isSelected
+                                          ? AppColors.primaryIndigo
+                                          : AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  if (item.badge != null)
+                                    Positioned(
+                                      top: -2,
+                                      right: -4,
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 5,
+                                          vertical: 1,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.errorAlpa,
+                                          borderRadius: BorderRadius.circular(
+                                            AppSpacing.radiusPill,
+                                          ),
+                                          border: Border.all(
+                                            color: Colors.white,
+                                            width: 1.5,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          item.badge!,
+                                          style:
+                                              AppTypography.microBadge.copyWith(
+                                            color: Colors.white,
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                item.label,
+                                style: AppTypography.microBadge.copyWith(
+                                  color: isSelected
+                                      ? AppColors.primaryIndigo
+                                      : AppColors.textSecondary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.w600
+                                      : FontWeight.w500,
+                                  fontSize: 11,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
           );
-        }).toList(),
+        },
       ),
     );
   }

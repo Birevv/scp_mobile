@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_typography.dart';
 import '../../constants/app_spacing.dart';
@@ -80,39 +81,49 @@ class SiswaDashboardScreen extends StatelessWidget {
                       formattedDate: state.currentDateLabel,
                       todayEvent: state.todayEvent,
                       activeCycle: state.activeCycle,
-                      onTapCalendarStatus: null,
+                      calendarEvents: state.calendarEvents,
+                      upcomingEvent: state.upcomingEvent,
+                      onTapCalendarStatus: () => onNavigate('academic_calendar'),
                     ),
 
                     const SizedBox(height: AppSpacing.lg),
 
                     // 3. CARD RINGKASAN KEHADIRAN (Donut Chart + 4 Indikator)
-                    if (state.isLoadingDashboard && summary.total == 0)
+                    if (state.isLoadingDashboard && !summary.hasData)
                       const DataLoadingCard(
                         message: 'Memuat ringkasan kehadiran siswa...',
+                      )
+                    else if (state.dashboardError != null && !summary.hasData)
+                      DataErrorCard(
+                        title: 'Gagal Memuat Ringkasan Kehadiran',
+                        message: state.dashboardError!,
+                        onRetry: () => state.fetchStudentDashboardData(),
                       )
                     else
                       AttendanceDonutCard(
                         title: 'Ringkasan Kehadiran',
-                        subtitle:
-                            'Persentase Kehadiran Semester Ini (${summary.percentage.toStringAsFixed(1)}%)',
+                        subtitle: summary.hasData && summary.percentage != null
+                            ? 'Persentase Kehadiran Semester Ini (${summary.percentage!.toStringAsFixed(1)}%)'
+                            : 'Belum ada data presensi',
                         hadirCount: summary.hadir,
                         sakitCount: summary.sakit,
                         izinCount: summary.izin,
                         alpaCount: summary.alpa,
+                        percentage: summary.percentage,
                         onTapDetail: () => onNavigate('siswa_history'),
                       ),
 
                     const SizedBox(height: AppSpacing.lg),
 
-                    // 4. AKSES CEPAT (Grid 4 Menu dengan Ikon Ilustratif)
+                    // 4. AKSES CEPAT (Grid Menu dengan Ikon Ilustratif)
                     MenuGrid(
                       sectionTitle: 'Akses Cepat',
                       items: [
                         MenuItemData(
                           label: 'Jadwal Pelajaran',
                           icon: Icons.calendar_month_rounded,
-                          iconColor: AppColors.primaryIndigo,
-                          bgColor: AppColors.lightIndigoBg,
+                          iconColor: AppColors.brandPrimary,
+                          bgColor: AppColors.brandAccent,
                           onTap: () => onNavigate('siswa_schedule'),
                         ),
                         MenuItemData(
@@ -125,19 +136,26 @@ class SiswaDashboardScreen extends StatelessWidget {
                         MenuItemData(
                           label: 'Riwayat Presensi',
                           icon: Icons.fact_check_rounded,
-                          iconColor: AppColors.primaryIndigo,
-                          bgColor: AppColors.lightIndigoBg,
+                          iconColor: AppColors.brandPrimary,
+                          bgColor: AppColors.brandAccent,
                           onTap: () => onNavigate('siswa_history'),
                         ),
                         MenuItemData(
                           label: 'Perizinan Saya',
                           icon: Icons.mark_email_read_rounded,
-                          iconColor: AppColors.secondaryTeal,
-                          bgColor: AppColors.lightTealBg,
+                          iconColor: AppColors.statusWarning,
+                          bgColor: AppColors.statusPendingBg,
                           badge: pendingRequests.isNotEmpty
                               ? '${pendingRequests.length}'
                               : null,
                           onTap: () => onNavigate('siswa_leave_status'),
+                        ),
+                        MenuItemData(
+                          label: 'Kalender',
+                          icon: Icons.date_range_rounded,
+                          iconColor: AppColors.brandNavy,
+                          bgColor: AppColors.brandAccent,
+                          onTap: () => onNavigate('academic_calendar'),
                         ),
                       ],
                     ),
@@ -156,20 +174,61 @@ class SiswaDashboardScreen extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        TextButton(
-                          onPressed: () => onNavigate('siswa_schedule'),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 8),
-                            minimumSize: const Size(0, 32),
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                          child: Text(
-                            'Lihat Semua ›',
-                            style: AppTypography.smallHint.copyWith(
-                              color: AppColors.primaryIndigo,
-                              fontWeight: FontWeight.w700,
+                        Row(
+                          children: [
+                            InkWell(
+                              onTap: () => state.triggerTestClassEndingNotification(
+                                context: context,
+                                onNavigateToSchedule: () => onNavigate('siswa_schedule'),
+                              ),
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandAccent,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: AppColors.brandPrimary.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(
+                                      Icons.notifications_active_rounded,
+                                      size: 12,
+                                      color: AppColors.brandPrimary,
+                                    ),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      'Uji Notif',
+                                      style: GoogleFonts.plusJakartaSans(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.brandPrimary,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 4),
+                            TextButton(
+                              onPressed: () => onNavigate('siswa_schedule'),
+                              style: TextButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 8),
+                                minimumSize: const Size(0, 32),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              ),
+                              child: Text(
+                                'Lihat Semua ›',
+                                style: AppTypography.smallHint.copyWith(
+                                  color: AppColors.primaryIndigo,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

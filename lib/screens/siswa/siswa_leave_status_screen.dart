@@ -4,7 +4,7 @@ import '../../constants/app_typography.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/models.dart';
 import '../../state/app_state.dart';
-import '../../widgets/headers/header_with_gradient.dart';
+import '../../widgets/headers/scp_page_header.dart';
 import '../../widgets/buttons/pill_button.dart';
 import '../../widgets/buttons/primary_button.dart';
 import '../../widgets/lists/leave_request_card.dart';
@@ -85,6 +85,9 @@ class _SiswaLeaveStatusScreenState extends State<SiswaLeaveStatusScreen> {
   Widget build(BuildContext context) {
     final user = widget.state.currentUser;
     final allRequests = widget.state.leaveRequests;
+    final isLoading = widget.state.isLoadingLeaves;
+    final hasError = widget.state.leavesError != null;
+    final hasAnyRequest = allRequests.isNotEmpty;
 
     final filteredRequests = allRequests.where((r) {
       if (_activeTab == 'Menunggu') return r.status == LeaveStatus.pending;
@@ -93,24 +96,34 @@ class _SiswaLeaveStatusScreenState extends State<SiswaLeaveStatusScreen> {
       return true;
     }).toList();
 
+    // Sesuai PRD Priority 1:
+    // FAB hanya ditampilkan pada List State (ketika siswa sudah punya pengajuan)
+    // Sembunyikan FAB pada Empty State, Loading, dan Error State
+    final bool showFab = hasAnyRequest && !isLoading;
+
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: FloatingActionButton.extended(
-        backgroundColor: AppColors.primaryIndigo,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: Text(
-          'Ajukan Izin',
-          style: AppTypography.labelButton.copyWith(color: Colors.white),
-        ),
-        onPressed: widget.onNewRequest,
-      ),
+      floatingActionButton: showFab
+          ? FloatingActionButton.extended(
+              backgroundColor: AppColors.primaryIndigo,
+              icon: const Icon(Icons.add_rounded, color: Colors.white),
+              label: Text(
+                'Ajukan Izin',
+                style: AppTypography.labelButton.copyWith(color: Colors.white),
+              ),
+              onPressed: widget.onNewRequest,
+            )
+          : null,
       body: Column(
         children: [
-          HeaderWithGradient(
-            userName: 'Perizinan Saya',
-            userSubtitle: '${user.name} • ${user.className}',
-            badgeText: widget.state.activeCycle.label,
-            actionButton: widget.onBack != null
+          // Standardized SCP Page Header
+          ScpPageHeader(
+            title: 'Perizinan Saya',
+            studentName: user.name,
+            className: user.className,
+            cycleLabel: null,
+            showCycleBadge: false,
+            leading: widget.onBack != null
                 ? IconButton(
                     icon: const Icon(
                       Icons.arrow_back_rounded,
@@ -131,7 +144,8 @@ class _SiswaLeaveStatusScreenState extends State<SiswaLeaveStatusScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (widget.state.leavesError != null) ...[
+                    // Error state banner if API failed
+                    if (hasError) ...[
                       DataErrorCard(
                         title: 'Gagal Memuat Data Perizinan',
                         message: widget.state.leavesError!,
@@ -139,85 +153,134 @@ class _SiswaLeaveStatusScreenState extends State<SiswaLeaveStatusScreen> {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: _tabs.map((tab) {
-                        final isSelected = _activeTab == tab;
-                        int count = 0;
-                        if (tab == 'Semua') count = allRequests.length;
-                        if (tab == 'Menunggu') {
-                          count = allRequests
-                              .where((r) => r.status == LeaveStatus.pending)
-                              .length;
-                        }
-                        if (tab == 'Disetujui') {
-                          count = allRequests
-                              .where((r) => r.status == LeaveStatus.approved)
-                              .length;
-                        }
-                        if (tab == 'Ditolak') {
-                          count = allRequests
-                              .where((r) => r.status == LeaveStatus.rejected)
-                              .length;
-                        }
 
-                        return Padding(
-                          padding: const EdgeInsets.only(right: AppSpacing.sm),
-                          child: PillButton(
-                            label: tab,
-                            count: count > 0 ? '$count' : null,
-                            isActive: isSelected,
-                            onPressed: () => setState(() => _activeTab = tab),
-                          ),
-                        );
-                      }).toList(),
+                    // Tab filter
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: _tabs.map((tab) {
+                          final isSelected = _activeTab == tab;
+                          int count = 0;
+                          if (tab == 'Semua') count = allRequests.length;
+                          if (tab == 'Menunggu') {
+                            count = allRequests
+                                .where((r) => r.status == LeaveStatus.pending)
+                                .length;
+                          }
+                          if (tab == 'Disetujui') {
+                            count = allRequests
+                                .where((r) => r.status == LeaveStatus.approved)
+                                .length;
+                          }
+                          if (tab == 'Ditolak') {
+                            count = allRequests
+                                .where((r) => r.status == LeaveStatus.rejected)
+                                .length;
+                          }
+
+                          return Padding(
+                            padding: const EdgeInsets.only(right: AppSpacing.sm),
+                            child: PillButton(
+                              label: tab,
+                              count: count > 0 ? '$count' : null,
+                              isActive: isSelected,
+                              onPressed: () => setState(() => _activeTab = tab),
+                            ),
+                          );
+                        }).toList(),
+                      ),
                     ),
-                  ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.lg),
 
-                  if (filteredRequests.isEmpty) ...[
-                    SoftCard(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 40),
-                          child: Column(
-                            children: [
-                              const Icon(
-                                Icons.assignment_turned_in_outlined,
-                                size: 52,
-                                color: AppColors.textTertiary,
-                              ),
-                              const SizedBox(height: AppSpacing.md),
-                              Text(
-                                'Belum Ada Pengajuan',
-                                style: AppTypography.cardTitle.copyWith(
-                                  color: AppColors.textSecondary,
+                    // Condition C: Loading State
+                    if (isLoading && allRequests.isEmpty) ...[
+                      const DataLoadingCard(
+                        message: 'Memuat data perizinan...',
+                      ),
+                    ]
+                    // Condition D: Error State (and no existing requests)
+                    else if (hasError && allRequests.isEmpty) ...[
+                      // DataErrorCard is already shown above, do NOT show empty state
+                      const SizedBox.shrink(),
+                    ]
+                    // Condition A: Empty State (siswa belum mempunyai pengajuan)
+                    else if (allRequests.isEmpty) ...[
+                      SoftCard(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 40),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.assignment_turned_in_outlined,
+                                  size: 52,
+                                  color: AppColors.textTertiary,
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Belum ada surat perizinan dengan status $_activeTab.',
-                                style: AppTypography.smallHint,
-                                textAlign: TextAlign.center,
-                              ),
-                              const SizedBox(height: AppSpacing.lg),
-                              PrimaryButton(
-                                label: 'Ajukan Izin Sekarang',
-                                width: 210,
-                                onPressed: widget.onNewRequest,
-                              ),
-                            ],
+                                const SizedBox(height: AppSpacing.md),
+                                Text(
+                                  'Belum Ada Pengajuan',
+                                  style: AppTypography.cardTitle.copyWith(
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Anda belum memiliki riwayat permohonan izin.',
+                                  style: AppTypography.smallHint,
+                                  textAlign: TextAlign.center,
+                                ),
+                                const SizedBox(height: AppSpacing.lg),
+                                PrimaryButton(
+                                  label: 'Ajukan Izin Sekarang',
+                                  width: 210,
+                                  onPressed: widget.onNewRequest,
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ] else ...[
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filteredRequests.length,
+                    ]
+                    // Tab Filter Empty State (siswa punya pengajuan, namun filter tab ini kosong)
+                    else if (filteredRequests.isEmpty) ...[
+                      SoftCard(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 36),
+                            child: Column(
+                              children: [
+                                const Icon(
+                                  Icons.filter_list_off_rounded,
+                                  size: 44,
+                                  color: AppColors.textTertiary,
+                                ),
+                                const SizedBox(height: AppSpacing.sm),
+                                Text(
+                                  'Tidak Ada Surat $_activeTab',
+                                  style: AppTypography.cardTitle.copyWith(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Tidak ada surat perizinan dengan status $_activeTab.',
+                                  style: AppTypography.smallHint,
+                                  textAlign: TextAlign.center,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ]
+                    // Condition B: List State (tampilkan daftar pengajuan)
+                    else ...[
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: filteredRequests.length,
                       separatorBuilder: (_, _) =>
                           const SizedBox(height: AppSpacing.md),
                       itemBuilder: (context, index) {

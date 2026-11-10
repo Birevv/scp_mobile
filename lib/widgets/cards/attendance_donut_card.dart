@@ -7,35 +7,47 @@ import 'soft_card.dart';
 
 class AttendanceDonutCard extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final int hadirCount;
   final int sakitCount;
   final int izinCount;
   final int alpaCount;
+  final double? percentage;
   final int? totalStudents;
   final VoidCallback? onTapDetail;
 
   const AttendanceDonutCard({
     super.key,
     this.title = 'Ringkasan Kehadiran',
-    this.subtitle = 'Rekapitulasi Kehadiran Bulanan',
+    this.subtitle,
     required this.hadirCount,
     required this.sakitCount,
     required this.izinCount,
     required this.alpaCount,
+    this.percentage,
     this.totalStudents,
     this.onTapDetail,
   });
 
-  double get _presentPercentage {
-    final sum = hadirCount + sakitCount + izinCount + alpaCount;
-    if (sum == 0) return 100.0;
-    return (hadirCount / sum) * 100.0;
+  int get totalMeetings => hadirCount + sakitCount + izinCount + alpaCount;
+  bool get hasData => totalMeetings > 0;
+
+  double? get calculatedPercentage {
+    if (totalMeetings == 0) return null;
+    return (hadirCount / totalMeetings) * 100.0;
   }
 
   @override
   Widget build(BuildContext context) {
-    final pctText = '${_presentPercentage.round()}%';
+    final double? effectivePct = percentage ?? calculatedPercentage;
+    final String pctText = hasData && effectivePct != null
+        ? '${effectivePct.toStringAsFixed(effectivePct % 1 == 0 ? 0 : 1)}%'
+        : '—';
+
+    final String effectiveSubtitle = subtitle ??
+        (hasData
+            ? 'Rekapitulasi Kehadiran Semester Ini ($pctText)'
+            : 'Belum ada data presensi');
 
     return SoftCard(
       padding: const EdgeInsets.all(AppSpacing.lg),
@@ -63,7 +75,7 @@ class AttendanceDonutCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      subtitle,
+                      effectiveSubtitle,
                       style: AppTypography.caption.copyWith(
                         color: AppColors.textSecondary,
                       ),
@@ -130,15 +142,17 @@ class AttendanceDonutCard extends StatelessWidget {
                         Text(
                           pctText,
                           style: AppTypography.tabularFigure.copyWith(
-                            fontSize: 20,
+                            fontSize: hasData ? 20 : 22,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.primaryIndigo,
+                            color: hasData
+                                ? AppColors.primaryIndigo
+                                : AppColors.textSecondary,
                             height: 1.0,
                           ),
                         ),
                         const SizedBox(height: 3),
                         Text(
-                          'Hadir',
+                          hasData ? 'Hadir' : 'Presensi',
                           style: AppTypography.microBadge.copyWith(
                             color: AppColors.textSecondary,
                             fontSize: 10.5,

@@ -1,9 +1,12 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../models/models.dart';
 import '../services/api_service.dart';
 import '../services/token_storage_service.dart';
+import '../services/in_app_notification_service.dart';
+import '../services/local_notification_service.dart';
 
 enum AuthStatus {
   checking,
@@ -19,23 +22,59 @@ class AppState extends ChangeNotifier {
   AppState({
     ApiService? apiService,
     TokenStorage? tokenStorage,
+    bool autoStartScheduleMonitoring = true,
   })  : _apiService = apiService ?? ApiService(),
         _tokenStorage = tokenStorage ?? const SecureTokenStorage() {
     _apiService.onUnauthorized = _handleUnauthorizedSession;
+    if (autoStartScheduleMonitoring) {
+      startScheduleMonitoring();
+    }
+  }
+
+  @override
+  void dispose() {
+    stopScheduleMonitoring();
+    super.dispose();
   }
 
   factory AppState.forTesting({
     UserProfile? user,
     TokenStorage? tokenStorage,
     ApiService? apiService,
+    StudentAttendanceSummary? studentSummary,
+    AcademicEventInfo? todayEvent,
+    List<LeaveRequest>? leaveRequests,
+    List<HomeroomStudent>? homeroomStudents,
+    List<TeachingSchedule>? teachingSchedules,
+    List<AcademicEventInfo>? calendarEvents,
   }) {
     final state = AppState(
       apiService: apiService,
       tokenStorage: tokenStorage ?? MemoryTokenStorage(),
+      autoStartScheduleMonitoring: false,
     );
     if (user != null) {
       state._currentUser = user;
       state._authStatus = AuthStatus.authenticated;
+    }
+    if (studentSummary != null) {
+      state._studentSummary = studentSummary;
+    }
+    if (todayEvent != null) {
+      state._todayEvent = todayEvent;
+    }
+    if (leaveRequests != null) {
+      state._leaveRequests = leaveRequests;
+    }
+    if (homeroomStudents != null) {
+      state._homeroomStudents = homeroomStudents;
+    }
+    if (teachingSchedules != null) {
+      state._teachingSchedules = teachingSchedules;
+      state._todaySchedules = teachingSchedules;
+    }
+    if (calendarEvents != null) {
+      state._calendarEvents = calendarEvents;
     }
     return state;
   }
@@ -94,14 +133,7 @@ class AppState extends ChangeNotifier {
       ? _currentTimeLabel
       : DateFormat('HH:mm').format(DateTime.now());
 
-  AcademicEventInfo _todayEvent = const AcademicEventInfo(
-    title: 'Hari Sekolah Efektif (KBM Normal)',
-    category: 'effective_day',
-    categoryLabel: 'Hari Sekolah Efektif',
-    isHoliday: false,
-    disableKbm: false,
-    requiresAttendance: true,
-  );
+  AcademicEventInfo _todayEvent = AcademicEventInfo.unconfigured();
   AcademicEventInfo get todayEvent => _todayEvent;
 
   // ===========================================================================
@@ -173,6 +205,77 @@ class AppState extends ChangeNotifier {
   List<StudentAttendance> _classRoster = [];
   List<StudentAttendance> get classRoster => _classRoster;
 
+  List<HomeroomStudent> _homeroomStudents = [];
+  List<HomeroomStudent> get homeroomStudents => _homeroomStudents;
+  bool _isLoadingHomeroomStudents = false;
+  bool get isLoadingHomeroomStudents => _isLoadingHomeroomStudents;
+  String? _homeroomStudentsError;
+  String? get homeroomStudentsError => _homeroomStudentsError;
+
+  List<AcademicEventInfo> _calendarEvents = [];
+  List<AcademicEventInfo> get calendarEvents => _calendarEvents;
+  bool _isLoadingCalendarEvents = false;
+  bool get isLoadingCalendarEvents => _isLoadingCalendarEvents;
+  String? _calendarEventsError;
+  String? get calendarEventsError => _calendarEventsError;
+
+  AcademicEventInfo? get ongoingEvent {
+    if (_todayEvent.isConfigured &&
+        _todayEvent.category != 'unconfigured' &&
+        _todayEvent.category != 'effective_day') {
+      return _todayEvent;
+    }
+    if (_calendarEvents.isEmpty) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (final event in _calendarEvents) {
+      if (event.startDate == null) continue;
+      final start = DateTime.tryParse(event.startDate!);
+      if (start == null) continue;
+      final end = event.endDate != null ? DateTime.tryParse(event.endDate!) : start;
+      if (end == null) continue;
+      final sDate = DateTime(start.year, start.month, start.day);
+      final eDate = DateTime(end.year, end.month, end.day);
+      if (!today.isBefore(sDate) && !today.isAfter(eDate)) {
+        return event;
+      }
+    }
+    return null;
+  }
+
+  AcademicEventInfo? get upcomingEvent {
+    if (_calendarEvents.isEmpty) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    AcademicEventInfo? closest;
+    int? minDays;
+    for (final event in _calendarEvents) {
+      if (event.startDate == null) continue;
+      final start = DateTime.tryParse(event.startDate!);
+      if (start == null) continue;
+      final sDate = DateTime(start.year, start.month, start.day);
+      if (sDate.isAfter(today)) {
+        final diff = sDate.difference(today).inDays;
+        if (minDays == null || diff < minDays) {
+          minDays = diff;
+          closest = event;
+        }
+      }
+    }
+    return closest;
+  }
+
+  int? get daysUntilUpcomingEvent {
+    final upcoming = upcomingEvent;
+    if (upcoming == null || upcoming.startDate == null) return null;
+    final start = DateTime.tryParse(upcoming.startDate!);
+    if (start == null) return null;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final sDate = DateTime(start.year, start.month, start.day);
+    return sDate.difference(today).inDays;
+  }
+
   TeachingSchedule? _selectedJournalSchedule;
   TeachingSchedule? get selectedJournalSchedule => _selectedJournalSchedule;
 
@@ -208,17 +311,110 @@ class AppState extends ChangeNotifier {
   }
 
   // ===========================================================================
+  // SCHEDULE NOTIFICATION (15 Menit Sebelum Waktu Habis & Demo Simulasi)
+  // ===========================================================================
+  Timer? _scheduleMonitoringTimer;
+  final Set<String> _notifiedEndingScheduleIds = {};
+
+  void startScheduleMonitoring() {
+    _scheduleMonitoringTimer?.cancel();
+    _scheduleMonitoringTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => checkScheduleEndingSoon(),
+    );
+  }
+
+  void stopScheduleMonitoring() {
+    _scheduleMonitoringTimer?.cancel();
+    _scheduleMonitoringTimer = null;
+  }
+
+  void checkScheduleEndingSoon() {
+    if (_todaySchedules.isEmpty) return;
+
+    final now = DateTime.now();
+    for (int i = 0; i < _todaySchedules.length; i++) {
+      final schedule = _todaySchedules[i];
+      if (_notifiedEndingScheduleIds.contains(schedule.id)) continue;
+
+      final parts = schedule.endTime.split(':');
+      if (parts.length < 2) continue;
+      final hour = int.tryParse(parts[0]);
+      final minute = int.tryParse(parts[1]);
+      if (hour == null || minute == null) continue;
+
+      final endDateTime = DateTime(now.year, now.month, now.day, hour, minute);
+      final diff = endDateTime.difference(now);
+
+      // Tepat atau di dalam rentang 15 menit sebelum waktu selesai
+      if (diff.inSeconds > 0 && diff.inMinutes <= 15) {
+        _notifiedEndingScheduleIds.add(schedule.id);
+
+        final nextSchedule =
+            (i + 1 < _todaySchedules.length) ? _todaySchedules[i + 1] : null;
+        final isTeacher = _currentUser?.role == UserRole.guru;
+
+        final title =
+            '15 Menit Menuju Pergantian Jam (Selesai ${schedule.endTime} WIB)';
+        final message = isTeacher
+            ? 'Sesi mengajar "${schedule.subjectName}" di ${schedule.className} (${schedule.roomName}) segera berakhir. ${nextSchedule != null ? 'Sesi berikutnya: "${nextSchedule.subjectName}" di ${nextSchedule.roomName} (${nextSchedule.startTime} WIB).' : 'Sesi terakhir hari ini selesai.'}'
+            : 'Pelajaran "${schedule.subjectName}" di ${schedule.roomName} segera berakhir. ${nextSchedule != null ? 'Sesi berikutnya: "${nextSchedule.subjectName}" bersama ${nextSchedule.teacherName} (${nextSchedule.startTime} WIB).' : 'Sesi terakhir hari ini selesai.'}';
+
+        InAppNotificationService.show(
+          title: title,
+          message: message,
+          primaryActionLabel: isTeacher ? 'Isi Jurnal' : 'Lihat Jadwal',
+          onPrimaryAction: () {
+            if (isTeacher) {
+              selectScheduleForJournal(schedule);
+            }
+          },
+          secondaryActionLabel: 'Tutup',
+          sendToSystemNotification: true,
+          payload: isTeacher ? 'guru_journal_input' : 'siswa_schedule',
+        );
+        break;
+      }
+    }
+  }
+
+  void triggerTestClassEndingNotification({
+    BuildContext? context,
+    VoidCallback? onNavigateToSchedule,
+    VoidCallback? onNavigateToJournal,
+  }) {
+    // Minta izin notifikasi jika belum diizinkan (khusus Android 13+)
+    LocalNotificationService.requestPermissions();
+
+    final isTeacher = _currentUser?.role == UserRole.guru;
+    final activeList =
+        _todaySchedules.isNotEmpty ? _todaySchedules : _teachingSchedules;
+    final current = activeList.isNotEmpty ? activeList.first : null;
+    final next = activeList.length > 1 ? activeList[1] : null;
+
+    InAppNotificationService.simulateClassEndingSoon(
+      context: context,
+      currentSubject: current?.subjectName ?? 'Pemrograman Perangkat Bergerak',
+      roomName: current?.roomName ?? 'Lab Komputer RPL 2',
+      className: current?.className ?? 'XII RPL 1',
+      endTime: current?.endTime.isNotEmpty == true ? current!.endTime : '09:45',
+      nextSubject: next?.subjectName ?? 'Basis Data & SQL',
+      nextRoom: next?.roomName ?? 'Lab Komputer RPL 1',
+      nextStartTime:
+          next?.startTime.isNotEmpty == true ? next!.startTime : '10:00',
+      isTeacher: isTeacher,
+      onNavigateToSchedule: onNavigateToSchedule,
+      onNavigateToJournal: onNavigateToJournal,
+    );
+  }
+
+  // ===========================================================================
   // 1. TOKEN VALIDATION ON APP START (`GET /api/me`)
   // ===========================================================================
   Future<AuthStatus> checkInitialAuth() async {
     _authStatus = AuthStatus.checking;
     _authErrorMessage = null;
     notifyListeners();
-
-    final savedUrl = await _tokenStorage.readBaseUrl();
-    if (savedUrl != null && savedUrl.isNotEmpty) {
-      _apiService.setBaseUrl(savedUrl);
-    }
 
     final savedToken = await _tokenStorage.readToken();
     if (savedToken == null || savedToken.isEmpty) {
@@ -383,6 +579,8 @@ class AppState extends ChangeNotifier {
     _leaveRequests = [];
     _personalHistory = [];
     _classRoster = [];
+    _homeroomStudents = [];
+    _calendarEvents = [];
     _selectedJournalSchedule = null;
     _teachingJournals = [];
     _classrooms = [];
@@ -400,12 +598,6 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> updateServerBaseUrl(String newUrl) async {
-    _apiService.setBaseUrl(newUrl);
-    await _tokenStorage.saveBaseUrl(_apiService.baseUrl);
-    notifyListeners();
-  }
-
   // ===========================================================================
   // 4. ROLE-BASED INITIAL DATA LOADING
   // ===========================================================================
@@ -416,8 +608,10 @@ class AppState extends ChangeNotifier {
       case UserRole.siswa:
         await Future.wait([
           fetchStudentDashboardData(),
+          fetchStudentSchedulesData(),
           fetchStudentLeavesData(),
           fetchStudentHistoryData(),
+          fetchAcademicCalendarEvents(),
         ]);
         break;
       case UserRole.guru:
@@ -426,13 +620,16 @@ class AppState extends ChangeNotifier {
           fetchTeacherSchedulesData(),
           fetchTeacherJournalsData(),
           fetchReferenceData(),
+          fetchAcademicCalendarEvents(),
         ]);
         break;
       case UserRole.waliKelas:
       case UserRole.guruBk:
         await Future.wait([
           fetchHomeroomDashboardData(),
+          fetchHomeroomStudentsData(),
           fetchHomeroomLeavesData(),
+          fetchAcademicCalendarEvents(),
         ]);
         break;
       case UserRole.unsupported:
@@ -465,6 +662,10 @@ class AppState extends ChangeNotifier {
 
       if (map['current_date'] != null) {
         _currentDateLabel = map['current_date'].toString();
+      }
+
+      if (map['active_cycle'] != null) {
+        _activeCycle = CycleType.fromString(map['active_cycle'].toString());
       }
 
       if (map['attendance_summary'] is Map<String, dynamic>) {
@@ -516,31 +717,61 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchStudentSchedulesData() async {
+  Future<void> fetchStudentSchedulesData({
+    CycleType? cycle,
+    String? dayOfWeek,
+  }) async {
     _isLoadingSchedules = true;
     _schedulesError = null;
     notifyListeners();
 
-    final res = await _apiService.fetchStudentTodaySchedules();
-    if (!res.success) {
-      _isLoadingSchedules = false;
-      _schedulesError = res.message;
-      notifyListeners();
-      return;
-    }
+    final targetCycle = cycle ?? _activeCycle;
+    final res = await _apiService.fetchStudentSchedules(
+      cycleType: cycle?.label,
+      dayOfWeek: dayOfWeek,
+    );
 
-    final list = _extractList(res.data);
-    _todaySchedules = list
-        .map(
-          (item) => TeachingSchedule.fromJson(
-            item,
-            fallbackCycle: _activeCycle,
-          ),
-        )
-        .toList();
-    _teachingSchedules = List<TeachingSchedule>.from(_todaySchedules);
-    if (_todaySchedules.isNotEmpty) {
-      _activeCycle = _todaySchedules.first.cycle;
+    if (!res.success) {
+      final fallbackRes = await _apiService.fetchStudentTodaySchedules();
+      if (!fallbackRes.success) {
+        _isLoadingSchedules = false;
+        _schedulesError = res.message;
+        notifyListeners();
+        return;
+      }
+      final list = _extractList(fallbackRes.data);
+      _todaySchedules = list
+          .map(
+            (item) => TeachingSchedule.fromJson(
+              item,
+              fallbackCycle: _activeCycle,
+            ),
+          )
+          .toList();
+      _teachingSchedules = List<TeachingSchedule>.from(_todaySchedules);
+      if (_teachingSchedules.isNotEmpty && cycle == null) {
+        _activeCycle = _teachingSchedules.first.cycle;
+      }
+    } else {
+      final list = _extractList(res.data);
+      _teachingSchedules = list
+          .map(
+            (item) => TeachingSchedule.fromJson(
+              item,
+              fallbackCycle: targetCycle,
+            ),
+          )
+          .toList();
+      if (_teachingSchedules.isNotEmpty && cycle == null) {
+        _activeCycle = _teachingSchedules.first.cycle;
+      }
+      final todayName = DateFormat('EEEE', 'id_ID').format(DateTime.now());
+      final matchedToday = _teachingSchedules
+          .where((s) => s.day.toLowerCase() == todayName.toLowerCase())
+          .toList();
+      if (matchedToday.isNotEmpty) {
+        _todaySchedules = matchedToday;
+      }
     }
 
     _isLoadingSchedules = false;
@@ -676,6 +907,10 @@ class AppState extends ChangeNotifier {
       if (map['current_date'] != null) {
         _currentDateLabel = map['current_date'].toString();
       }
+
+      if (map['active_cycle'] != null) {
+        _activeCycle = CycleType.fromString(map['active_cycle'].toString());
+      }
       if (map['active_cycle'] != null) {
         _activeCycle = CycleType.fromString(map['active_cycle'].toString());
       }
@@ -735,7 +970,7 @@ class AppState extends ChangeNotifier {
 
     final targetCycle = cycle ?? _activeCycle;
     final res = await _apiService.fetchTeacherSchedules(
-      cycleType: targetCycle.label,
+      cycleType: cycle?.label,
     );
 
     if (!res.success) {
@@ -1040,6 +1275,82 @@ class AppState extends ChangeNotifier {
     }
 
     _isLoadingDashboard = false;
+    notifyListeners();
+  }
+
+  Future<void> fetchHomeroomStudentsData({int? classroomId}) async {
+    _isLoadingHomeroomStudents = true;
+    _homeroomStudentsError = null;
+    notifyListeners();
+
+    final res = await _apiService.fetchHomeroomStudents(
+      classroomId: classroomId ?? _selectedHomeroomClassroomId,
+    );
+
+    if (!res.success) {
+      _isLoadingHomeroomStudents = false;
+      _homeroomStudentsError = res.message;
+      notifyListeners();
+      return;
+    }
+
+    List<Map<String, dynamic>> list = [];
+    if (res.data is Map<String, dynamic> && res.data['students'] != null) {
+      list = _extractList(res.data['students']);
+    } else {
+      list = _extractList(res.data);
+    }
+
+    _homeroomStudents = list.map(HomeroomStudent.fromJson).toList();
+
+    _classRoster = _homeroomStudents.map((s) {
+      return StudentAttendance(
+        id: s.id,
+        studentId: int.tryParse(s.id),
+        studentName: s.name,
+        nisn: s.nisn,
+        className: s.className,
+        status: s.todayStatus,
+        isAutoSynced: s.isAutoSynced,
+        leaveReason: s.leaveReason,
+        notes: s.leaveReason,
+        date: DateTime.now(),
+        time: '-',
+        subject: '-',
+        teacherName: currentUser.name,
+      );
+    }).toList();
+
+    _isLoadingHomeroomStudents = false;
+    notifyListeners();
+  }
+
+  Future<void> fetchAcademicCalendarEvents({
+    int? month,
+    int? year,
+    String? grade,
+  }) async {
+    _isLoadingCalendarEvents = true;
+    _calendarEventsError = null;
+    notifyListeners();
+
+    final res = await _apiService.fetchCalendarEvents(
+      month: month,
+      year: year,
+      grade: grade,
+    );
+
+    if (!res.success) {
+      _isLoadingCalendarEvents = false;
+      _calendarEventsError = res.message;
+      notifyListeners();
+      return;
+    }
+
+    final list = _extractList(res.data);
+    _calendarEvents = list.map(AcademicEventInfo.fromJson).toList();
+
+    _isLoadingCalendarEvents = false;
     notifyListeners();
   }
 

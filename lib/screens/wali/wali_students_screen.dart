@@ -8,15 +8,16 @@ import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/inputs/search_bar.dart';
 import '../../widgets/lists/student_list_item.dart';
 import '../../widgets/cards/soft_card.dart';
+import '../../widgets/cards/data_state_view.dart';
 
 class WaliStudentsScreen extends StatefulWidget {
   final AppState state;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   const WaliStudentsScreen({
     super.key,
     required this.state,
-    required this.onBack,
+    this.onBack,
   });
 
   @override
@@ -27,13 +28,23 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
   String _searchQuery = '';
 
   @override
-  Widget build(BuildContext context) {
-    final roster = widget.state.classRoster;
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (widget.state.homeroomStudents.isEmpty) {
+        widget.state.fetchHomeroomStudentsData();
+      }
+    });
+  }
 
-    final filtered = roster.where((s) {
+  @override
+  Widget build(BuildContext context) {
+    final students = widget.state.homeroomStudents;
+
+    final filtered = students.where((s) {
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
-      return s.studentName.toLowerCase().contains(q) || s.nisn.toLowerCase().contains(q);
+      return s.name.toLowerCase().contains(q) || s.nisn.toLowerCase().contains(q);
     }).toList();
 
     return Scaffold(
@@ -43,17 +54,20 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
           // Header with Gradient
           HeaderWithGradient(
             userName: 'Daftar Siswa Binaan',
-            userSubtitle: '${widget.state.currentUser.className} • ${roster.length} Siswa Terdaftar',
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: widget.onBack,
-            ),
+            userSubtitle: '${widget.state.currentUser.className} • ${students.length} Siswa Terdaftar',
+            leading: widget.onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: widget.onBack,
+                  )
+                : null,
           ),
 
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primaryIndigo,
               onRefresh: () => Future.wait([
+                widget.state.fetchHomeroomStudentsData(),
                 widget.state.fetchHomeroomDashboardData(),
                 widget.state.fetchHomeroomLeavesData(),
               ]),
@@ -63,74 +77,91 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                  // Search Bar
-                  AppSearchBar(
-                    hintText: 'Cari siswa atau NISN...',
-                    onChanged: (val) => setState(() => _searchQuery = val.trim()),
-                  ),
+                    // Search Bar
+                    AppSearchBar(
+                      hintText: 'Cari siswa atau NISN...',
+                      onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                    ),
 
-                  const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.lg),
 
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('Rekap Kehadiran Siswa', style: AppTypography.sectionTitle),
-                      Text(
-                        '${filtered.length} Siswa',
-                        style: AppTypography.smallHint.copyWith(color: AppColors.textTertiary),
-                      ),
-                    ],
-                  ),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text('Rekap Kehadiran Siswa', style: AppTypography.sectionTitle),
+                        ),
+                        Text(
+                          '${filtered.length} Siswa',
+                          style: AppTypography.smallHint.copyWith(color: AppColors.textTertiary),
+                        ),
+                      ],
+                    ),
 
-                  const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.sm),
 
-                  if (filtered.isEmpty) ...[
-                    SoftCard(
-                      child: Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 36),
-                          child: Text(
-                            'Tidak ada siswa yang sesuai pencarian.',
-                            style: AppTypography.smallHint,
+                    if (widget.state.isLoadingHomeroomStudents) ...[
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 48),
+                        child: Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.primaryIndigo,
                           ),
                         ),
                       ),
-                    ),
-                  ] else ...[
-                    ListView.separated(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: filtered.length,
-                      separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
-                      itemBuilder: (context, index) {
-                        final student = filtered[index];
-                        final bool hasAttention = student.status == AttendanceStatus.alpa;
+                    ] else if (widget.state.homeroomStudentsError != null) ...[
+                      DataErrorCard(
+                        title: 'Gagal Memuat Data Siswa',
+                        message: widget.state.homeroomStudentsError!,
+                        onRetry: () => widget.state.fetchHomeroomStudentsData(),
+                      ),
+                    ] else if (filtered.isEmpty) ...[
+                      SoftCard(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 36),
+                            child: Text(
+                              'Tidak ada siswa yang sesuai pencarian.',
+                              style: AppTypography.smallHint,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: filtered.length,
+                        separatorBuilder: (_, _) => const SizedBox(height: AppSpacing.sm),
+                        itemBuilder: (context, index) {
+                          final student = filtered[index];
+                          final bool hasAttention = student.alpa >= 3;
 
-                        return StudentListItem(
-                          studentName: student.studentName,
-                          nisn: 'NISN. ${student.nisn}',
-                          statusBadge: student.status.label,
-                          statusBadgeColor: student.status.color,
-                          statusBadgeBgColor: student.status.bgColor,
-                          address: hasAttention ? 'Perlu perhatian khusus BK' : null,
-                          onTap: () => _showStudentDetailModal(context, student),
-                        );
-                      },
-                    ),
+                          return StudentListItem(
+                            studentName: student.name,
+                            nisn: 'NISN. ${student.nisn}',
+                            statusBadge: student.todayStatus.label,
+                            statusBadgeColor: student.todayStatus.color,
+                            statusBadgeBgColor: student.todayStatus.bgColor,
+                            address: hasAttention ? 'Perlu perhatian khusus BK (≥3 Alpa)' : null,
+                            onTap: () => _showStudentDetailModal(context, student),
+                          );
+                        },
+                      ),
+                    ],
+
+                    const SizedBox(height: 32),
                   ],
-
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
           ),
-        ),
         ],
       ),
     );
   }
 
-  void _showStudentDetailModal(BuildContext context, StudentAttendance student) {
+  void _showStudentDetailModal(BuildContext context, HomeroomStudent student) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -165,7 +196,7 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                   radius: 24,
                   backgroundColor: AppColors.lightBlueBorder,
                   child: Text(
-                    student.studentName.isNotEmpty ? student.studentName[0] : 'S',
+                    student.name.isNotEmpty ? student.name[0] : 'S',
                     style: AppTypography.sectionTitle.copyWith(color: AppColors.primaryBlue),
                   ),
                 ),
@@ -174,10 +205,42 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(student.studentName, style: AppTypography.cardTitle),
+                      Text(student.name, style: AppTypography.cardTitle),
                       Text('NISN. ${student.nisn}', style: AppTypography.smallHint),
                       Text('Kelas: ${student.className}', style: AppTypography.smallHint),
                     ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            const Divider(height: 1, color: AppColors.border),
+            const SizedBox(height: AppSpacing.md),
+            Text('Rekapitulasi Presensi Semester:', style: AppTypography.cardTitle),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                _buildStatPill('Hadir', student.hadir, AppColors.alertGreenBg, AppColors.successHadir),
+                const SizedBox(width: 6),
+                _buildStatPill('Sakit', student.sakit, AppColors.alertAmberBg, AppColors.warningSakit),
+                const SizedBox(width: 6),
+                _buildStatPill('Izin', student.izin, AppColors.alertBlueBg, AppColors.infoIzin),
+                const SizedBox(width: 6),
+                _buildStatPill('Alpa', student.alpa, AppColors.alertRedBg, AppColors.errorAlpa),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Text(
+                  'Persentase Kehadiran: ',
+                  style: AppTypography.smallHint.copyWith(fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  student.percentage != null ? '${student.percentage}%' : '— (Belum ada presensi)',
+                  style: AppTypography.smallHint.copyWith(
+                    color: (student.percentage ?? 0) >= 85 ? AppColors.successHadir : AppColors.errorAlpa,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
               ],
@@ -190,23 +253,23 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: student.status.bgColor,
+                color: student.todayStatus.bgColor,
                 borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.circle, size: 10, color: student.status.color),
+                  Icon(Icons.circle, size: 10, color: student.todayStatus.color),
                   const SizedBox(width: 6),
                   Text(
-                    student.status.label,
-                    style: AppTypography.labelButton.copyWith(color: student.status.color),
+                    student.todayStatus.label,
+                    style: AppTypography.labelButton.copyWith(color: student.todayStatus.color),
                   ),
                   if (student.isAutoSynced) ...[
                     const SizedBox(width: 8),
                     Text(
                       '(Tersinkron Surat Izin Approved)',
-                      style: AppTypography.microBadge.copyWith(color: student.status.color),
+                      style: AppTypography.microBadge.copyWith(color: student.todayStatus.color),
                     ),
                   ],
                 ],
@@ -233,6 +296,30 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                 onPressed: () => Navigator.pop(ctx),
                 child: const Text('Tutup'),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatPill(String label, int count, Color bg, Color text) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(AppSpacing.radiusSmall),
+        ),
+        child: Column(
+          children: [
+            Text(
+              count.toString(),
+              style: AppTypography.cardTitle.copyWith(color: text, fontSize: 16),
+            ),
+            Text(
+              label,
+              style: AppTypography.microBadge.copyWith(color: text),
             ),
           ],
         ),

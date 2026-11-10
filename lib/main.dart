@@ -3,6 +3,8 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'models/models.dart';
 import 'state/app_state.dart';
 import 'theme/app_theme.dart';
+import 'services/in_app_notification_service.dart';
+import 'services/local_notification_service.dart';
 import 'widgets/navigation/app_bottom_nav_bar.dart';
 
 // Screens
@@ -10,6 +12,7 @@ import 'screens/shared/splash_screen.dart';
 import 'screens/shared/login_screen.dart';
 import 'screens/shared/profile_screen.dart';
 import 'screens/shared/unsupported_role_screen.dart';
+import 'screens/shared/academic_calendar_screen.dart';
 import 'screens/siswa/siswa_dashboard_screen.dart';
 import 'screens/siswa/siswa_schedule_screen.dart';
 import 'screens/siswa/siswa_history_screen.dart';
@@ -28,15 +31,24 @@ import 'screens/wali/wali_students_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('id_ID', null);
+  await LocalNotificationService.initialize(
+    onNotificationClickCallback: (payload) {
+      if (payload != null && _ScpMainShellState.navigateToRoute != null) {
+        _ScpMainShellState.navigateToRoute!(payload);
+      }
+    },
+  );
   runApp(const ScpApp());
 }
 
 class ScpApp extends StatefulWidget {
   final AppState? appState;
+  final Duration splashDuration;
 
   const ScpApp({
     super.key,
     this.appState,
+    this.splashDuration = const Duration(milliseconds: 1800),
   });
 
   @override
@@ -56,13 +68,17 @@ class _ScpAppState extends State<ScpApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SCP Mobile - SMK School Class Progress',
+      title: 'School Class Progress App',
+      navigatorKey: InAppNotificationService.navigatorKey,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       home: ListenableBuilder(
         listenable: _appState,
         builder: (context, child) {
-          return ScpMainShell(state: _appState);
+          return ScpMainShell(
+            state: _appState,
+            splashDuration: widget.splashDuration,
+          );
         },
       ),
     );
@@ -71,10 +87,12 @@ class _ScpAppState extends State<ScpApp> {
 
 class ScpMainShell extends StatefulWidget {
   final AppState state;
+  final Duration splashDuration;
 
   const ScpMainShell({
     super.key,
     required this.state,
+    this.splashDuration = const Duration(milliseconds: 1800),
   });
 
   @override
@@ -82,13 +100,25 @@ class ScpMainShell extends StatefulWidget {
 }
 
 class _ScpMainShellState extends State<ScpMainShell> {
-  String _currentRoute = '';
+  static void Function(String route)? navigateToRoute;
+  String _currentRoute = 'splash';
+  bool _splashCompleted = false;
   LeaveRequest? _selectedLeaveDetail;
+  final List<String> _routeHistory = [];
 
   @override
   void initState() {
     super.initState();
+    navigateToRoute = _navigateTo;
     _syncRouteWithAuthState();
+  }
+
+  @override
+  void dispose() {
+    if (navigateToRoute == _navigateTo) {
+      navigateToRoute = null;
+    }
+    super.dispose();
   }
 
   @override
@@ -98,46 +128,49 @@ class _ScpMainShellState extends State<ScpMainShell> {
   }
 
   void _syncRouteWithAuthState() {
+    if (!_splashCompleted) {
+      if (_currentRoute != 'splash') {
+        _currentRoute = 'splash';
+      }
+      return;
+    }
+
     final status = widget.state.authStatus;
     if (status == AuthStatus.checking || status == AuthStatus.connectionError) {
       if (_currentRoute != 'splash') {
         _currentRoute = 'splash';
+        _routeHistory.clear();
       }
     } else if (status == AuthStatus.unauthenticated) {
       if (_currentRoute != 'login') {
         _currentRoute = 'login';
+        _routeHistory.clear();
       }
     } else if (status == AuthStatus.authenticated) {
       if (_currentRoute.isEmpty ||
           _currentRoute == 'splash' ||
           _currentRoute == 'login') {
         _currentRoute = _getDefaultDashboardForRole(widget.state.currentRole);
+        _routeHistory.clear();
       }
     }
   }
 
   void _navigateTo(String route) {
     setState(() {
+      if (_currentRoute.isNotEmpty && _currentRoute != route) {
+        _routeHistory.add(_currentRoute);
+      }
       _currentRoute = route;
     });
   }
 
   void _navigateBack() {
     setState(() {
-      switch (widget.state.currentRole) {
-        case UserRole.siswa:
-          _currentRoute = 'siswa_dashboard';
-          break;
-        case UserRole.guru:
-          _currentRoute = 'guru_dashboard';
-          break;
-        case UserRole.waliKelas:
-        case UserRole.guruBk:
-          _currentRoute = 'wali_dashboard';
-          break;
-        case UserRole.unsupported:
-          _currentRoute = 'unsupported';
-          break;
+      if (_routeHistory.isNotEmpty) {
+        _currentRoute = _routeHistory.removeLast();
+      } else {
+        _currentRoute = _getDefaultDashboardForRole(widget.state.currentRole);
       }
     });
   }
@@ -255,6 +288,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
   }
 
   void _onTabSelected(int index, UserRole role) {
+    _routeHistory.clear();
     switch (role) {
       case UserRole.siswa:
         if (index == 0) _navigateTo('siswa_dashboard');
@@ -287,7 +321,16 @@ class _ScpMainShellState extends State<ScpMainShell> {
   Widget _buildCurrentScreen() {
     switch (_currentRoute) {
       case 'splash':
-        return SplashScreen(state: widget.state);
+        return SplashScreen(
+          state: widget.state,
+          minimumDuration: widget.splashDuration,
+          onFinish: () {
+            setState(() {
+              _splashCompleted = true;
+              _syncRouteWithAuthState();
+            });
+          },
+        );
 
       case 'login':
         return LoginScreen(
@@ -323,13 +366,13 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'siswa_schedule':
         return SiswaScheduleScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
         );
 
       case 'siswa_history':
         return SiswaHistoryScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
         );
 
       case 'siswa_leave_request':
@@ -342,7 +385,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'siswa_leave_status':
         return SiswaLeaveStatusScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
           onNewRequest: () => _navigateTo('siswa_leave_request'),
         );
 
@@ -363,8 +406,9 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'guru_my_schedule':
         return GuruMyScheduleScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
           onAddSchedule: () => _navigateTo('guru_schedule_input'),
+          onFillJournal: (schedule) => _navigateTo('guru_journal_input'),
         );
 
       case 'guru_journal_input':
@@ -377,7 +421,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'guru_journal_history':
         return GuruJournalHistoryScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
         );
 
       // Wali Kelas & Guru BK screens
@@ -390,11 +434,11 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'wali_leave_queue':
         return WaliLeaveQueueScreen(
           state: widget.state,
-          onBack: _navigateBack,
+          onBack: null,
           onSelectDetail: (req) {
             setState(() {
               _selectedLeaveDetail = req;
-              _currentRoute = 'wali_leave_detail';
+              _navigateTo('wali_leave_detail');
             });
           },
         );
@@ -408,11 +452,11 @@ class _ScpMainShellState extends State<ScpMainShell> {
         if (targetRequest == null) {
           return WaliLeaveQueueScreen(
             state: widget.state,
-            onBack: _navigateBack,
+            onBack: null,
             onSelectDetail: (req) {
               setState(() {
                 _selectedLeaveDetail = req;
-                _currentRoute = 'wali_leave_detail';
+                _navigateTo('wali_leave_detail');
               });
             },
           );
@@ -421,12 +465,18 @@ class _ScpMainShellState extends State<ScpMainShell> {
         return WaliLeaveDetailScreen(
           state: widget.state,
           request: targetRequest,
-          onBack: () => _navigateTo('wali_leave_queue'),
+          onBack: _navigateBack,
           onCompleted: () => _navigateTo('wali_leave_queue'),
         );
 
       case 'wali_students':
         return WaliStudentsScreen(
+          state: widget.state,
+          onBack: null,
+        );
+
+      case 'academic_calendar':
+        return AcademicCalendarScreen(
           state: widget.state,
           onBack: _navigateBack,
         );
@@ -470,7 +520,13 @@ class _ScpMainShellState extends State<ScpMainShell> {
         _currentRoute != 'unsupported';
 
     return Scaffold(
-      body: _buildCurrentScreen(),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: KeyedSubtree(
+          key: ValueKey(_currentRoute),
+          child: _buildCurrentScreen(),
+        ),
+      ),
       bottomNavigationBar: showBottomNav
           ? AppBottomNavBar(
               currentIndex: activeTabIndex,

@@ -12,13 +12,13 @@ import '../../widgets/cards/soft_card.dart';
 
 class WaliLeaveQueueScreen extends StatefulWidget {
   final AppState state;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
   final Function(LeaveRequest req) onSelectDetail;
 
   const WaliLeaveQueueScreen({
     super.key,
     required this.state,
-    required this.onBack,
+    this.onBack,
     required this.onSelectDetail,
   });
 
@@ -62,10 +62,12 @@ class _WaliLeaveQueueScreenState extends State<WaliLeaveQueueScreen> {
           HeaderWithGradient(
             userName: 'Verifikasi Izin Siswa',
             userSubtitle: 'Wali Kelas XII RPL 1 • Antrean Surat',
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: widget.onBack,
-            ),
+            leading: widget.onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: widget.onBack,
+                  )
+                : null,
           ),
 
           Expanded(

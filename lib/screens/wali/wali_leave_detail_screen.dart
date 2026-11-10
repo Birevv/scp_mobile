@@ -29,6 +29,30 @@ class WaliLeaveDetailScreen extends StatefulWidget {
 class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
   final _rejectReasonController = TextEditingController();
   bool _isProcessing = false;
+  late LeaveRequest _currentRequest;
+  bool _isLoadingDetail = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentRequest = widget.request;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchFreshDetail();
+    });
+  }
+
+  Future<void> _fetchFreshDetail() async {
+    setState(() => _isLoadingDetail = true);
+    final fresh = await widget.state.fetchHomeroomLeaveDetailData(widget.request.id);
+    if (mounted) {
+      setState(() {
+        _isLoadingDetail = false;
+        if (fresh != null) {
+          _currentRequest = fresh;
+        }
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -42,7 +66,7 @@ class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Setujui Pengajuan Izin?'),
         content: Text(
-          'Setelah disetujui, presensi ananda ${widget.request.studentName} akan otomatis tersinkronisasi sebagai "${widget.request.type.label}" di jurnal mengajar guru bersangkutan.',
+          'Setelah disetujui, presensi ananda ${_currentRequest.studentName} akan otomatis tersinkronisasi sebagai "${_currentRequest.type.label}" di jurnal mengajar guru bersangkutan.',
           style: AppTypography.bodyText,
         ),
         actions: [
@@ -123,7 +147,7 @@ class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
     setState(() => _isProcessing = true);
 
     final res = await widget.state.verifyHomeroomLeave(
-      id: widget.request.id,
+      id: _currentRequest.id,
       approve: isApproved,
       rejectionNote: rejectReason,
     );
@@ -213,7 +237,7 @@ class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
                               ),
                               const SizedBox(height: AppSpacing.sm),
                               Text(
-                                widget.request.documentName ?? 'Surat_Keterangan_Resmi.pdf',
+                                _currentRequest.documentName ?? 'Surat_Keterangan_Resmi.pdf',
                                 style: AppTypography.cardTitle.copyWith(fontSize: 14),
                                 textAlign: TextAlign.center,
                               ),
@@ -265,7 +289,7 @@ class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final req = widget.request;
+    final req = _currentRequest;
     final durationDays = req.endDate.difference(req.startDate).inDays + 1;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
@@ -340,11 +364,12 @@ class _WaliLeaveDetailScreenState extends State<WaliLeaveDetailScreen> {
           HeaderWithGradient(
             userName: 'Tinjau Surat Perizinan',
             userSubtitle: '${req.studentName} • ${req.className}',
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: widget.onBack,
             ),
           ),
+          if (_isLoadingDetail) const LinearProgressIndicator(minHeight: 2),
 
           Expanded(
             child: SingleChildScrollView(

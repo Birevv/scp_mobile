@@ -4,12 +4,14 @@ import 'package:flutter/material.dart';
 import '../../constants/app_colors.dart';
 import '../../constants/app_typography.dart';
 import '../../constants/app_spacing.dart';
+import 'header_background_pattern.dart';
 
 class HeaderWithGradient extends StatelessWidget {
   final String userName;
   final String userSubtitle;
   final String? greeting;
   final String? avatarUrl;
+  final Widget? leading;
   final Widget? actionButton;
   final Widget? bottomChild;
   final String? badgeText;
@@ -24,6 +26,7 @@ class HeaderWithGradient extends StatelessWidget {
     required this.userSubtitle,
     this.greeting,
     this.avatarUrl,
+    this.leading,
     this.actionButton,
     this.bottomChild,
     this.badgeText,
@@ -59,16 +62,25 @@ class HeaderWithGradient extends StatelessWidget {
           bottomLeft: Radius.circular(24),
           bottomRight: Radius.circular(24),
         ),
-        child: Padding(
-          padding: EdgeInsets.only(
-            top: topPad + 14,
-            bottom: AppSpacing.lg,
-            left: AppSpacing.xl,
-            right: AppSpacing.xl,
-          ),
-          child: usePersonalLayout
-              ? _buildPersonalDashboardHeader(context)
-              : _buildSubpageHeader(context),
+        child: Stack(
+          children: [
+            // Background Curved Geometry Pattern (Design System Resmi)
+            const Positioned.fill(
+              child: HeaderBackgroundPattern(),
+            ),
+            // Foreground Content
+            Padding(
+              padding: EdgeInsets.only(
+                top: topPad + 14,
+                bottom: AppSpacing.lg,
+                left: AppSpacing.xl,
+                right: AppSpacing.xl,
+              ),
+              child: usePersonalLayout
+                  ? _buildPersonalDashboardHeader(context)
+                  : _buildSubpageHeader(context),
+            ),
+          ],
         ),
       ),
     );
@@ -101,7 +113,7 @@ class HeaderWithGradient extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'SCP Mobile',
+                          'School Class Progress App',
                           style: AppTypography.microBadge.copyWith(
                             color: Colors.white,
                             fontSize: 12,
@@ -289,6 +301,10 @@ class HeaderWithGradient extends StatelessWidget {
             Expanded(
               child: Row(
                 children: [
+                  if (leading != null) ...[
+                    leading!,
+                    const SizedBox(width: 8),
+                  ],
                   if (avatarUrl != null) ...[
                     _buildAvatar(radius: 21),
                     const SizedBox(width: 12),

@@ -8,6 +8,7 @@ import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/cards/soft_card.dart';
 import '../../widgets/cards/attendance_donut_card.dart';
 import '../../widgets/cards/data_state_view.dart';
+import '../../widgets/cards/today_info_card.dart';
 import '../../widgets/menu_grid.dart';
 
 class WaliDashboardScreen extends StatelessWidget {
@@ -80,6 +81,18 @@ class WaliDashboardScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
+
+                    // INFORMASI HARI INI & KALENDER
+                    TodayInfoCard(
+                      formattedDate: state.currentDateLabel,
+                      todayEvent: state.todayEvent,
+                      activeCycle: state.activeCycle,
+                      calendarEvents: state.calendarEvents,
+                      upcomingEvent: state.upcomingEvent,
+                      onTapCalendarStatus: () => onNavigate('academic_calendar'),
+                    ),
+
+                    const SizedBox(height: AppSpacing.lg),
 
                     // 2. RINGKASAN KEHADIRAN (Donut Chart)
                     if (state.isLoadingDashboard && summary.totalStudents == 0)
@@ -253,8 +266,8 @@ class WaliDashboardScreen extends StatelessWidget {
                         MenuItemData(
                           label: 'Verifikasi Izin',
                           icon: Icons.fact_check_rounded,
-                          iconColor: AppColors.primaryIndigo,
-                          bgColor: AppColors.lightIndigoBg,
+                          iconColor: AppColors.brandPrimary,
+                          bgColor: AppColors.brandAccent,
                           badge: pendingRequests.isNotEmpty
                               ? '${pendingRequests.length}'
                               : null,
@@ -270,8 +283,8 @@ class WaliDashboardScreen extends StatelessWidget {
                         MenuItemData(
                           label: 'Rekap Presensi',
                           icon: Icons.pie_chart_rounded,
-                          iconColor: AppColors.primaryIndigo,
-                          bgColor: AppColors.lightIndigoBg,
+                          iconColor: AppColors.brandPrimary,
+                          bgColor: AppColors.brandAccent,
                           onTap: () => onNavigate('wali_students'),
                         ),
                         MenuItemData(
@@ -280,6 +293,13 @@ class WaliDashboardScreen extends StatelessWidget {
                           iconColor: AppColors.secondaryTeal,
                           bgColor: AppColors.lightTealBg,
                           onTap: () => onNavigate('wali_leave_queue'),
+                        ),
+                        MenuItemData(
+                          label: 'Kalender',
+                          icon: Icons.date_range_rounded,
+                          iconColor: AppColors.brandNavy,
+                          bgColor: AppColors.brandAccent,
+                          onTap: () => onNavigate('academic_calendar'),
                         ),
                       ],
                     ),

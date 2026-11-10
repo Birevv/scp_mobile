@@ -219,8 +219,8 @@ class _GuruScheduleInputScreenState extends State<GuruScheduleInputScreen> {
           HeaderWithGradient(
             userName: 'Tambah Jadwal Mengajar',
             userSubtitle: widget.state.currentUser.name,
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: widget.onBack,
             ),
           ),
@@ -241,7 +241,8 @@ class _GuruScheduleInputScreenState extends State<GuruScheduleInputScreen> {
                       children: [
                         Expanded(
                           child: PillButton(
-                            label: 'Putaran 1 (Teori)',
+                            label: 'Putaran 1',
+                            activeColor: AppColors.brandPrimary,
                             isActive: _selectedCycle == CycleType.putaran1,
                             onPressed: () => setState(
                                 () => _selectedCycle = CycleType.putaran1),
@@ -250,7 +251,8 @@ class _GuruScheduleInputScreenState extends State<GuruScheduleInputScreen> {
                         const SizedBox(width: AppSpacing.sm),
                         Expanded(
                           child: PillButton(
-                            label: 'Putaran 2 (Praktik)',
+                            label: 'Putaran 2',
+                            activeColor: AppColors.brandPrimary,
                             isActive: _selectedCycle == CycleType.putaran2,
                             onPressed: () => setState(
                                 () => _selectedCycle = CycleType.putaran2),

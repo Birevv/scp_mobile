@@ -268,7 +268,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text('Konfirmasi Keluar', style: AppTypography.sectionTitle),
         content: Text(
-          'Apakah Anda yakin ingin keluar dari aplikasi SCP Mobile SMK Negeri 1 Bantul?',
+          'Apakah Anda yakin ingin keluar dari aplikasi School Class Progress App SMK Negeri 1 Bantul?',
           style: AppTypography.bodySmall,
         ),
         actions: [
@@ -308,10 +308,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         child: Column(
           children: [
             HeaderWithGradient(
-              isDashboard: true,
-              greeting: 'Profil Pengguna,',
-              userName: user.name,
-              userSubtitle: '${user.role.title} • ${user.className}',
+              userName: 'Profil Saya',
+              userSubtitle: '${user.name} • ${user.className}',
               badgeText: '${widget.state.activeCycle.label} Aktif',
               avatarUrl: user.avatarUrl,
             ),

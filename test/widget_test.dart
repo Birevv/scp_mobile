@@ -27,7 +27,7 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('School Class Progress'), findsOneWidget);
+    expect(find.text('School Class Progress App'), findsOneWidget);
     expect(find.text('SMK Negeri 1 Bantul'), findsOneWidget);
   });
 
@@ -47,7 +47,7 @@ void main() {
     await tester.pump();
 
     // Verify brand and title
-    expect(find.text('School Class Progress'), findsOneWidget);
+    expect(find.text('School Class Progress App'), findsOneWidget);
     expect(find.text('SMK Negeri 1 Bantul'), findsOneWidget);
     expect(find.text('Autentikasi Pengguna'), findsOneWidget);
     expect(find.text('Masuk ke Sistem'), findsOneWidget);

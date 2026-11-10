@@ -71,11 +71,11 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
     super.dispose();
   }
 
-  Future<void> _pickPhoto(ImageSource source) async {
+  Future<void> _pickPhoto([ImageSource source = ImageSource.camera]) async {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: source,
+        source: ImageSource.camera,
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 85,
@@ -88,7 +88,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Foto kegiatan kelas siap diunggah: ${picked.name}'),
+              content: Text('Foto kegiatan kelas berhasil diambil: ${picked.name}'),
               backgroundColor: AppColors.secondaryTeal,
               duration: const Duration(seconds: 2),
             ),
@@ -99,7 +99,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal mengambil foto: $e'),
+          content: Text('Gagal mengambil foto dari kamera: $e'),
           backgroundColor: AppColors.statusAlpa,
         ),
       );
@@ -238,8 +238,8 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                 ? '${sched.className} • ${sched.subjectName}'
                 : 'Pilih Jadwal Mengajar',
             badgeText: widget.state.currentDateLabel,
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: widget.onBack,
             ),
           ),
@@ -329,9 +329,11 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                           ),
                         ),
                         const SizedBox(width: AppSpacing.sm),
-                        Text(
-                          'Jurnal Pembelajaran (Wajib)',
-                          style: AppTypography.sectionTitle,
+                        Expanded(
+                          child: Text(
+                            'Jurnal Pembelajaran (Wajib)',
+                            style: AppTypography.sectionTitle,
+                          ),
                         ),
                       ],
                     ),
@@ -375,10 +377,15 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
 
                     const SizedBox(height: AppSpacing.md),
 
-                    // Camera Photo Activity Attachment
+                    // Camera Photo Activity Attachment (Real-time only)
                     Text(
                       'Dokumentasi Foto Kegiatan Kelas (Opsional)',
                       style: AppTypography.cardTitle,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Ambil foto dokumentasi kegiatan kelas langsung melalui kamera (real-time). Unggah file galeri dinonaktifkan.',
+                      style: AppTypography.caption,
                     ),
                     const SizedBox(height: AppSpacing.xs),
                     if (_activityPhotoName != null) ...[
@@ -416,7 +423,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Foto kegiatan kelas terlampir',
+                                    'Foto kamera realtime kegiatan terlampir',
                                     style: AppTypography.microBadge.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -439,68 +446,36 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                         ),
                       ),
                     ] else ...[
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: AppColors.primaryIndigo,
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusMedium,
-                                  ),
-                                ),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: AppColors.primaryIndigo,
+                              width: 1.5,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMedium,
                               ),
-                              icon: const Icon(
-                                Icons.camera_alt_outlined,
-                                color: AppColors.primaryIndigo,
-                                size: 18,
-                              ),
-                              label: Text(
-                                'Ambil Kamera',
-                                style: AppTypography.labelButton.copyWith(
-                                  color: AppColors.primaryIndigo,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              onPressed: () => _pickPhoto(ImageSource.camera),
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(
-                                  color: AppColors.secondaryTeal,
-                                ),
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(
-                                    AppSpacing.radiusMedium,
-                                  ),
-                                ),
-                              ),
-                              icon: const Icon(
-                                Icons.photo_library_outlined,
-                                color: AppColors.secondaryTeal,
-                                size: 18,
-                              ),
-                              label: Text(
-                                'Pilih Galeri',
-                                style: AppTypography.labelButton.copyWith(
-                                  color: AppColors.secondaryTeal,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              onPressed: () => _pickPhoto(ImageSource.gallery),
+                          icon: const Icon(
+                            Icons.camera_alt_rounded,
+                            color: AppColors.primaryIndigo,
+                            size: 20,
+                          ),
+                          label: Text(
+                            'Ambil Foto Kegiatan (Kamera Realtime)',
+                            style: AppTypography.labelButton.copyWith(
+                              color: AppColors.primaryIndigo,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ],
+                          onPressed: () => _pickPhoto(ImageSource.camera),
+                        ),
                       ),
                     ],
 
@@ -557,30 +532,36 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                         ),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _buildMiniCounter(
-                            'Hadir',
-                            hadirCount,
-                            AppColors.statusHadir,
-                          ),
-                          _buildMiniCounter(
-                            'Izin',
-                            izinCount,
-                            AppColors.statusIzin,
-                          ),
-                          _buildMiniCounter(
-                            'Sakit',
-                            sakitCount,
-                            AppColors.statusSakit,
-                          ),
-                          _buildMiniCounter(
-                            'Alpa',
-                            alpaCount,
-                            AppColors.statusAlpa,
-                          ),
-                        ],
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _buildMiniCounter(
+                              'Hadir',
+                              hadirCount,
+                              AppColors.statusHadir,
+                            ),
+                            const SizedBox(width: 14),
+                            _buildMiniCounter(
+                              'Izin',
+                              izinCount,
+                              AppColors.statusIzin,
+                            ),
+                            const SizedBox(width: 14),
+                            _buildMiniCounter(
+                              'Sakit',
+                              sakitCount,
+                              AppColors.statusSakit,
+                            ),
+                            const SizedBox(width: 14),
+                            _buildMiniCounter(
+                              'Alpa',
+                              alpaCount,
+                              AppColors.statusAlpa,
+                            ),
+                          ],
+                        ),
                       ),
                     ),
 

@@ -95,11 +95,11 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
     }
   }
 
-  Future<void> _pickAttachment(ImageSource source) async {
+  Future<void> _pickAttachment([ImageSource source = ImageSource.camera]) async {
     try {
       final picker = ImagePicker();
       final picked = await picker.pickImage(
-        source: source,
+        source: ImageSource.camera,
         maxWidth: 1600,
         maxHeight: 1600,
         imageQuality: 85,
@@ -112,7 +112,7 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Lampiran siap diunggah: ${picked.name}'),
+              content: Text('Foto bukti berhasil diambil: ${picked.name}'),
               backgroundColor: AppColors.secondaryTeal,
               duration: const Duration(seconds: 2),
             ),
@@ -123,7 +123,7 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gagal memilih berkas: $e'),
+          content: Text('Gagal mengambil foto dari kamera: $e'),
           backgroundColor: AppColors.statusAlpa,
         ),
       );
@@ -137,7 +137,7 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Harap lampirkan bukti surat dokter / foto surat izin orang tua!',
+            'Harap ambil foto bukti surat (dokter/izin) secara langsung via kamera!',
           ),
           backgroundColor: AppColors.statusAlpa,
         ),
@@ -181,25 +181,75 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
     }
   }
 
+  bool get _hasUnsavedData =>
+      _reasonController.text.trim().isNotEmpty || _pickedFile != null;
+
+  void _handleBackWithConfirmation() {
+    if (_hasUnsavedData) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Text(
+            'Batalkan Pengisian Form?',
+            style: AppTypography.sectionTitle,
+          ),
+          content: Text(
+            'Data perizinan yang telah Anda isi akan hilang. Apakah Anda yakin ingin kembali?',
+            style: AppTypography.bodySmall,
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Lanjut Mengisi'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.statusAlpa,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+              onPressed: () {
+                Navigator.pop(ctx);
+                widget.onBack();
+              },
+              child: const Text('Ya, Batalkan'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      widget.onBack();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final user = widget.state.currentUser;
     final durationDays = _endDate.difference(_startDate).inDays + 1;
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          HeaderWithGradient(
-            userName: 'Form Pengajuan Izin',
-            userSubtitle: '${user.name} • ${user.className}',
-            badgeText: widget.state.activeCycle.label,
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-              onPressed: widget.onBack,
+    return PopScope(
+      canPop: !_hasUnsavedData,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        _handleBackWithConfirmation();
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            HeaderWithGradient(
+              userName: 'Form Pengajuan Izin',
+              userSubtitle: '${user.name} • ${user.className}',
+              badgeText: widget.state.activeCycle.label,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                onPressed: _handleBackWithConfirmation,
+              ),
             ),
-          ),
 
           Expanded(
             child: SingleChildScrollView(
@@ -443,7 +493,7 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Unggah foto surat dokter, surat izin orang tua, atau surat dispensasi (JPG, PNG, PDF maks. 2MB).',
+                      'Ambil foto bukti surat dokter atau surat izin langsung melalui kamera (real-time). Unggah file galeri atau PDF dinonaktifkan.',
                       style: AppTypography.caption,
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -478,7 +528,7 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                   Text(
-                                    '1.2 MB • Siap dikirim ke Wali Kelas / BK',
+                                    'Foto kamera realtime • Siap dikirim ke Wali Kelas / BK',
                                     style: AppTypography.microBadge.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -502,68 +552,36 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
                       )
                     else
                       SoftCard(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         borderRadius: AppSpacing.radiusLarge,
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.primaryIndigo,
-                                  ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 13),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                icon: const Icon(
-                                  Icons.camera_alt_outlined,
-                                  color: AppColors.primaryIndigo,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  'Ambil Foto',
-                                  style: AppTypography.microBadge.copyWith(
-                                    color: AppColors.primaryIndigo,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                onPressed: () => _pickAttachment(ImageSource.camera),
+                        child: SizedBox(
+                          width: double.infinity,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(
+                                color: AppColors.primaryIndigo,
+                                width: 1.5,
+                              ),
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
                               ),
                             ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                style: OutlinedButton.styleFrom(
-                                  side: const BorderSide(
-                                    color: AppColors.secondaryTeal,
-                                  ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 13),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                icon: const Icon(
-                                  Icons.upload_file_rounded,
-                                  color: AppColors.secondaryTeal,
-                                  size: 18,
-                                ),
-                                label: Text(
-                                  'Pilih File/PDF',
-                                  style: AppTypography.microBadge.copyWith(
-                                    color: AppColors.secondaryTeal,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                                onPressed: () => _pickAttachment(ImageSource.gallery),
+                            icon: const Icon(
+                              Icons.camera_alt_rounded,
+                              color: AppColors.primaryIndigo,
+                              size: 20,
+                            ),
+                            label: Text(
+                              'Ambil Foto Bukti (Kamera Realtime)',
+                              style: AppTypography.microBadge.copyWith(
+                                color: AppColors.primaryIndigo,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
                               ),
                             ),
-                          ],
+                            onPressed: () => _pickAttachment(ImageSource.camera),
+                          ),
                         ),
                       ),
 
@@ -602,8 +620,9 @@ class _SiswaLeaveRequestScreenState extends State<SiswaLeaveRequestScreen> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildTypeCard({
     required LeaveType type,

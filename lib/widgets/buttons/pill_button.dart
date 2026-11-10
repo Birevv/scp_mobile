@@ -54,6 +54,7 @@ class PillButton extends StatelessWidget {
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (icon != null) ...[
                 Icon(
@@ -63,11 +64,15 @@ class PillButton extends StatelessWidget {
                 ),
                 const SizedBox(width: 6),
               ],
-              Text(
-                count != null ? '$label ($count)' : label,
-                style: AppTypography.labelButton.copyWith(
-                  color: isActive ? AppColors.white : AppColors.textSecondary,
-                  fontSize: 13,
+              Flexible(
+                child: Text(
+                  count != null ? '$label ($count)' : label,
+                  style: AppTypography.labelButton.copyWith(
+                    color: isActive ? AppColors.white : AppColors.textSecondary,
+                    fontSize: 13,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

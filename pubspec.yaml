@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_local_notifications: 18.0.1
   flutter_secure_storage: ^11.2.0
   google_fonts: ^9.0.0
   http: ^1.6.0
@@ -19,8 +20,25 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
   assets:
     - assets/images/
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/SMK_Negeri_1_Bantul_logo.png"
+  web:
+    generate: true
+    image_path: "assets/images/SMK_Negeri_1_Bantul_logo.png"
+  windows:
+    generate: true
+    image_path: "assets/images/SMK_Negeri_1_Bantul_logo.png"
+    icon_size: 48
+  macos:
+    generate: true
+    image_path: "assets/images/SMK_Negeri_1_Bantul_logo.png"
+

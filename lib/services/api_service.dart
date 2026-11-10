@@ -32,7 +32,7 @@ class ApiService {
   ApiService({
     String baseUrl = const String.fromEnvironment(
       'SCP_API_URL',
-      defaultValue: 'http://10.0.2.2:8000/api',
+      defaultValue: 'https://progreskelas.my.id/api',
     ),
     http.Client? client,
     this.onUnauthorized,
@@ -326,6 +326,15 @@ class ApiService {
   // ===========================================================================
 
   Future<ApiResponse> fetchStudentDashboard() => get('/student/dashboard');
+  Future<ApiResponse> fetchStudentSchedules({
+    String? cycleType,
+    String? dayOfWeek,
+  }) {
+    final q = <String, String>{};
+    if (cycleType != null && cycleType.isNotEmpty) q['cycle_type'] = cycleType;
+    if (dayOfWeek != null && dayOfWeek.isNotEmpty) q['day_of_week'] = dayOfWeek;
+    return get('/student/schedules', query: q.isNotEmpty ? q : null);
+  }
   Future<ApiResponse> fetchStudentTodaySchedules() =>
       get('/student/schedules/today');
   Future<ApiResponse> fetchStudentAttendanceSummary() =>
@@ -473,6 +482,12 @@ class ApiService {
     final q = <String, String>{};
     if (classroomId != null) q['classroom_id'] = classroomId.toString();
     return get('/homeroom/dashboard', query: q);
+  }
+
+  Future<ApiResponse> fetchHomeroomStudents({int? classroomId}) {
+    final q = <String, String>{};
+    if (classroomId != null) q['classroom_id'] = classroomId.toString();
+    return get('/homeroom/students', query: q.isNotEmpty ? q : null);
   }
 
   Future<ApiResponse> fetchHomeroomLeaveRequests({String? status}) {

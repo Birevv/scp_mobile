@@ -6,16 +6,15 @@ import '../../models/models.dart';
 import '../../state/app_state.dart';
 import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/cards/soft_card.dart';
-import '../../widgets/buttons/pill_button.dart';
 
 class GuruJournalHistoryScreen extends StatefulWidget {
   final AppState state;
-  final VoidCallback onBack;
+  final VoidCallback? onBack;
 
   const GuruJournalHistoryScreen({
     super.key,
     required this.state,
-    required this.onBack,
+    this.onBack,
   });
 
   @override
@@ -23,20 +22,73 @@ class GuruJournalHistoryScreen extends StatefulWidget {
 }
 
 class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
-  String _selectedMonth = 'Oktober 2026';
-  late CycleType _selectedCycle;
+  String _selectedMonth = 'November 2026';
+  CycleType? _selectedCycle;
 
-  final List<String> _months = ['Oktober 2026', 'September 2026', 'Agustus 2026'];
+  final List<String> _months = [
+    'November 2026',
+    'Oktober 2026',
+    'September 2026',
+    'Agustus 2026',
+  ];
 
   @override
   void initState() {
     super.initState();
-    _selectedCycle = widget.state.activeCycle;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _reloadJournals();
+    });
+  }
+
+  int? _parseMonth(String monthStr) {
+    final lower = monthStr.toLowerCase();
+    if (lower.contains('januari')) return 1;
+    if (lower.contains('februari')) return 2;
+    if (lower.contains('maret')) return 3;
+    if (lower.contains('april')) return 4;
+    if (lower.contains('mei')) return 5;
+    if (lower.contains('juni')) return 6;
+    if (lower.contains('juli')) return 7;
+    if (lower.contains('agustus')) return 8;
+    if (lower.contains('september')) return 9;
+    if (lower.contains('oktober')) return 10;
+    if (lower.contains('november')) return 11;
+    if (lower.contains('desember')) return 12;
+    return null;
+  }
+
+  int? _parseYear(String monthStr) {
+    final parts = monthStr.split(' ');
+    if (parts.length >= 2) {
+      return int.tryParse(parts.last);
+    }
+    return null;
+  }
+
+  void _reloadJournals({String? monthStr, CycleType? cycle}) {
+    final targetCycle = cycle ?? _selectedCycle ?? widget.state.activeCycle;
+    final targetMonthStr = monthStr ?? _selectedMonth;
+    final month = _parseMonth(targetMonthStr);
+    final year = _parseYear(targetMonthStr);
+    widget.state.fetchTeacherJournalsData(
+      cycle: targetCycle,
+      month: month,
+      year: year,
+    );
+  }
+
+  void _onCycleSelected(CycleType cycle) {
+    setState(() {
+      _selectedCycle = cycle;
+    });
+    _reloadJournals(cycle: cycle);
   }
 
   @override
   Widget build(BuildContext context) {
     final journals = widget.state.teachingJournals;
+    final currentCycle = _selectedCycle ?? widget.state.activeCycle;
+    final isCurrentSystemActive = currentCycle == widget.state.activeCycle;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -46,23 +98,181 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
           HeaderWithGradient(
             userName: 'Riwayat Jurnal Mengajar',
             userSubtitle: widget.state.currentUser.name,
-            actionButton: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: widget.onBack,
-            ),
+            badgeText: currentCycle.label,
+            leading: widget.onBack != null
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                    onPressed: widget.onBack,
+                  )
+                : null,
           ),
 
           Expanded(
             child: RefreshIndicator(
               color: AppColors.primaryIndigo,
-              onRefresh: () =>
-                  widget.state.fetchTeacherJournalsData(cycle: _selectedCycle),
+              onRefresh: () => widget.state.fetchTeacherJournalsData(
+                cycle: currentCycle,
+                month: _parseMonth(_selectedMonth),
+                year: _parseYear(_selectedMonth),
+              ),
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: const EdgeInsets.all(AppSpacing.lg),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                  // Selector Putaran Pembelajaran (Auto-Sync Website + Opsi Putaran 1 & 2)
+                  Row(
+                    children: CycleType.values.map((cycle) {
+                      final isSelected = currentCycle == cycle;
+                      final isSystemActive = widget.state.activeCycle == cycle;
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(
+                            right: cycle == CycleType.values.first ? 6 : 0,
+                            left: cycle == CycleType.values.last ? 6 : 0,
+                          ),
+                          child: InkWell(
+                            onTap: () => _onCycleSelected(cycle),
+                            borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? AppColors.brandPrimary : Colors.white,
+                                borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                                border: Border.all(
+                                  color: isSelected ? AppColors.brandPrimary : AppColors.border,
+                                  width: isSelected ? 1.5 : 1.0,
+                                ),
+                                boxShadow: isSelected
+                                    ? [
+                                        BoxShadow(
+                                          color: AppColors.brandPrimary.withValues(alpha: 0.22),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 3),
+                                        ),
+                                      ]
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Flexible(
+                                    child: Text(
+                                      cycle.label,
+                                      style: AppTypography.cardTitle.copyWith(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isSystemActive) ...[
+                                    const SizedBox(width: 5),
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: isSelected
+                                            ? Colors.white.withValues(alpha: 0.22)
+                                            : AppColors.statusApprovedBg,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: isSelected
+                                              ? Colors.white.withValues(alpha: 0.4)
+                                              : AppColors.statusSuccess.withValues(alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        'Aktif',
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.w700,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : AppColors.statusApprovedText,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  const SizedBox(height: AppSpacing.sm),
+
+                  // Indikator Siklus Putaran Aktif (Otomatis dari Sistem / Website)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    decoration: BoxDecoration(
+                      color: isCurrentSystemActive ? AppColors.lightIndigoBg : const Color(0xFFFFFBEB),
+                      borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+                      border: Border.all(
+                        color: isCurrentSystemActive
+                            ? AppColors.lightIndigoBorder
+                            : const Color(0xFFFDE68A),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(5),
+                          decoration: BoxDecoration(
+                            color: isCurrentSystemActive
+                                ? AppColors.brandPrimary
+                                : const Color(0xFFD97706),
+                            borderRadius: BorderRadius.circular(7),
+                          ),
+                          child: Icon(
+                            isCurrentSystemActive ? Icons.autorenew_rounded : Icons.info_outline_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                            Text(
+                              isCurrentSystemActive
+                                  ? '${currentCycle.label} (Aktif di Sistem)'
+                                  : '${currentCycle.label} (Pratinjau)',
+                              style: AppTypography.cardTitle.copyWith(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: isCurrentSystemActive
+                                    ? AppColors.brandNavy
+                                    : const Color(0xFF92400E),
+                              ),
+                            ),
+                              const SizedBox(height: 1),
+                              Text(
+                                isCurrentSystemActive
+                                    ? 'Siklus otomatis disinkronkan dengan website kurikulum.'
+                                    : 'Menampilkan riwayat ${currentCycle.label}. Siklus aktif di website saat ini: ${widget.state.activeCycle.label}.',
+                                style: AppTypography.caption.copyWith(
+                                  fontSize: 10.5,
+                                  color: isCurrentSystemActive
+                                      ? AppColors.textSecondary
+                                      : const Color(0xFFB45309),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(height: AppSpacing.md),
                   // Month Dropdown & Cycle Selector
                   Row(
                     children: [
@@ -85,32 +295,13 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                                       ))
                                   .toList(),
                               onChanged: (val) {
-                                if (val != null) setState(() => _selectedMonth = val);
+                                if (val != null && val != _selectedMonth) {
+                                  setState(() => _selectedMonth = val);
+                                  _reloadJournals(monthStr: val);
+                                }
                               },
                             ),
                           ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: AppSpacing.sm),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: PillButton(
-                          label: 'Putaran 1',
-                          isActive: _selectedCycle == CycleType.putaran1,
-                          onPressed: () => setState(() => _selectedCycle = CycleType.putaran1),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: PillButton(
-                          label: 'Putaran 2',
-                          isActive: _selectedCycle == CycleType.putaran2,
-                          onPressed: () => setState(() => _selectedCycle = CycleType.putaran2),
                         ),
                       ),
                     ],
