@@ -518,6 +518,9 @@ class AppState extends ChangeNotifier {
       );
     }
 
+    // Bersihkan sesi dan state lokal dari pengguna sebelumnya untuk isolasi total
+    await _clearSessionData();
+
     _apiService.setAuthToken(token);
     await _tokenStorage.saveToken(token);
     if (rememberMe) {
@@ -653,9 +656,6 @@ class AppState extends ChangeNotifier {
           fetchHomeroomStudentsData(),
           fetchHomeroomLeavesData(),
           fetchAcademicCalendarEvents(),
-          fetchTeacherDashboardData(),
-          fetchTeacherSchedulesData(),
-          fetchTeacherJournalsData(),
           fetchReferenceData(),
         ]);
         break;
@@ -796,9 +796,7 @@ class AppState extends ChangeNotifier {
       final matchedToday = _teachingSchedules
           .where((s) => s.day.toLowerCase() == todayName.toLowerCase())
           .toList();
-      if (matchedToday.isNotEmpty) {
-        _todaySchedules = matchedToday;
-      }
+      _todaySchedules = matchedToday;
     }
 
     _isLoadingSchedules = false;
@@ -1196,6 +1194,8 @@ class AppState extends ChangeNotifier {
     );
 
     if (res.success) {
+      _selectedJournalSchedule = null;
+      _classRoster = [];
       await Future.wait([
         fetchTeacherDashboardData(),
         fetchTeacherJournalsData(),

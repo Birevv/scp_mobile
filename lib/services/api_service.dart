@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiResponse {
   final bool success;
@@ -194,12 +195,14 @@ class ApiService {
       request.fields.addAll(fields);
 
       if (fileField != null) {
+        final mediaType = _resolveMediaType(fileName, filePath);
         if (fileBytes != null) {
           request.files.add(
             http.MultipartFile.fromBytes(
               fileField,
               fileBytes,
               filename: fileName ?? 'upload.jpg',
+              contentType: mediaType,
             ),
           );
         } else if (filePath != null && filePath.isNotEmpty) {
@@ -208,6 +211,7 @@ class ApiService {
               fileField,
               filePath,
               filename: fileName,
+              contentType: mediaType,
             ),
           );
         }
@@ -220,6 +224,14 @@ class ApiService {
     } catch (_) {
       return _networkErrorResponse;
     }
+  }
+
+  MediaType _resolveMediaType(String? name, String? path) {
+    final lower = (name ?? path ?? '').toLowerCase();
+    if (lower.endsWith('.png')) return MediaType('image', 'png');
+    if (lower.endsWith('.pdf')) return MediaType('application', 'pdf');
+    if (lower.endsWith('.webp')) return MediaType('image', 'webp');
+    return MediaType('image', 'jpeg');
   }
 
   // ===========================================================================

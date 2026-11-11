@@ -109,7 +109,7 @@ class WaliDashboardScreen extends StatelessWidget {
                     ),
 
                     // 2. ALERT JURNAL MENGAJAR TERLAMBAT (>30 menit)
-                    if (delayedAlerts.isNotEmpty) ...[
+                    if (!isBk && delayedAlerts.isNotEmpty) ...[
                       const SizedBox(height: AppSpacing.lg),
                       Builder(
                         builder: (context) {

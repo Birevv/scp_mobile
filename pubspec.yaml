@@ -1,9 +1,9 @@
 name: scp_mobile
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.1+2
 
-environment:
+environment:  
   sdk: ^3.9.0
 
 dependencies:
@@ -13,6 +13,7 @@ dependencies:
   flutter_secure_storage: ^11.2.0
   google_fonts: ^9.0.0
   http: ^1.6.0
+  http_parser: ^4.1.2
   image_picker: ^1.2.4
   intl: ^0.20.3
 

@@ -45,14 +45,16 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
   }
 
   Future<void> _loadInitialRoster() async {
+    final unFilled = widget.state.todaySchedules.where((s) => !s.hasJournal).toList();
     final sched = widget.state.selectedJournalSchedule ??
-        (widget.state.todaySchedules.isNotEmpty
-            ? widget.state.todaySchedules.first
-            : (widget.state.teachingSchedules.isNotEmpty
-                ? widget.state.teachingSchedules.first
+        (unFilled.isNotEmpty
+            ? unFilled.first
+            : (widget.state.todaySchedules.isNotEmpty
+                ? widget.state.todaySchedules.first
                 : null));
 
     if (sched != null) {
+      widget.state.selectScheduleForJournal(sched);
       await widget.state.fetchScheduleStudentsRoster(sched.id);
       if (mounted) {
         setState(() {
@@ -63,9 +65,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
   }
 
   void _showSchedulePicker(BuildContext context) {
-    final schedules = widget.state.todaySchedules.isNotEmpty
-        ? widget.state.todaySchedules
-        : widget.state.teachingSchedules;
+    final schedules = widget.state.todaySchedules;
 
     if (schedules.isEmpty) return;
 
@@ -107,44 +107,82 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                     itemBuilder: (_, index) {
                       final item = schedules[index];
                       final isSelected = widget.state.selectedJournalSchedule?.id == item.id;
+                      final isAlreadyFilled = item.hasJournal;
                       return ListTile(
                         leading: CircleAvatar(
-                          backgroundColor: item.hasJournal
+                          backgroundColor: isAlreadyFilled
                               ? AppColors.alertGreenBg
                               : AppColors.alertAmberBg,
                           child: Icon(
-                            item.hasJournal
+                            isAlreadyFilled
                                 ? Icons.check_circle_rounded
                                 : Icons.edit_note_rounded,
-                            color: item.hasJournal
+                            color: isAlreadyFilled
                                 ? AppColors.statusHadir
                                 : AppColors.statusSakit,
                             size: 20,
                           ),
                         ),
-                        title: Text(
-                          item.subjectName,
-                          style: AppTypography.cardTitle.copyWith(fontSize: 14),
+                        title: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.subjectName,
+                                style: AppTypography.cardTitle.copyWith(
+                                  fontSize: 14,
+                                  color: isAlreadyFilled ? AppColors.textTertiary : AppColors.textPrimary,
+                                ),
+                              ),
+                            ),
+                            if (isAlreadyFilled)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.alertGreenBg,
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  'Sudah Diisi',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.statusHadir,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         subtitle: Text(
                           '${item.className} • ${item.roomName} (${item.startTime} - ${item.endTime} WIB)',
-                          style: AppTypography.caption,
+                          style: AppTypography.caption.copyWith(
+                            color: isAlreadyFilled ? AppColors.textTertiary : AppColors.textSecondary,
+                          ),
                         ),
                         trailing: isSelected
                             ? const Icon(Icons.check_rounded, color: AppColors.primaryIndigo)
                             : null,
-                        onTap: () async {
-                          Navigator.pop(ctx);
-                          widget.state.selectScheduleForJournal(item);
-                          await widget.state.fetchScheduleStudentsRoster(item.id);
-                          if (mounted) {
-                            setState(() {
-                              _roster = widget.state.classRoster
-                                  .map((s) => s.copyWith())
-                                  .toList();
-                            });
-                          }
-                        },
+                        enabled: !isAlreadyFilled,
+                        onTap: isAlreadyFilled
+                            ? () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Jadwal ini sudah diisi jurnal hari ini. Tidak dapat diisi lagi.'),
+                                    backgroundColor: AppColors.statusAlpa,
+                                  ),
+                                );
+                              }
+                            : () async {
+                                Navigator.pop(ctx);
+                                widget.state.selectScheduleForJournal(item);
+                                await widget.state.fetchScheduleStudentsRoster(item.id);
+                                if (mounted) {
+                                  setState(() {
+                                    _roster = widget.state.classRoster
+                                        .map((s) => s.copyWith())
+                                        .toList();
+                                  });
+                                }
+                              },
                       );
                     },
                   ),
@@ -205,14 +243,34 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
     final sched = widget.state.selectedJournalSchedule ??
         (widget.state.todaySchedules.isNotEmpty
             ? widget.state.todaySchedules.first
-            : (widget.state.teachingSchedules.isNotEmpty
-                ? widget.state.teachingSchedules.first
-                : null));
+            : null);
 
     if (sched == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Tidak ada jadwal pelajaran aktif untuk jurnal ini.'),
+          backgroundColor: AppColors.statusAlpa,
+        ),
+      );
+      return;
+    }
+
+    if (sched.hasJournal) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Jurnal untuk jadwal mengajar ini sudah pernah diisi hari ini.'),
+          backgroundColor: AppColors.statusAlpa,
+        ),
+      );
+      return;
+    }
+
+    if (_pickedPhoto == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Bukti foto kegiatan mengajar wajib diambil secara realtime via kamera!',
+          ),
           backgroundColor: AppColors.statusAlpa,
         ),
       );
@@ -317,10 +375,14 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
           ],
         ),
         child: PrimaryButton(
-          label: 'Simpan Jurnal & Presensi Kelas',
-          icon: Icons.check_circle_outline,
+          label: (sched != null && sched.hasJournal)
+              ? 'Jurnal Sudah Pernah Diisi'
+              : 'Simpan Jurnal & Presensi Kelas',
+          icon: (sched != null && sched.hasJournal)
+              ? Icons.check_circle_rounded
+              : Icons.check_circle_outline,
           isLoading: _isSubmitting,
-          onPressed: _handleSubmit,
+          onPressed: (sched != null && !sched.hasJournal) ? _handleSubmit : null,
         ),
       ),
       body: Column(
@@ -386,8 +448,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                                 ],
                               ),
                             ),
-                            if ((widget.state.todaySchedules.length > 1) ||
-                                (widget.state.teachingSchedules.length > 1))
+                            if (widget.state.todaySchedules.length > 1)
                               TextButton.icon(
                                 style: TextButton.styleFrom(
                                   padding: const EdgeInsets.symmetric(
@@ -420,6 +481,41 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                         child: Text(
                           'Pilih jadwal mengajar terlebih dahulu dari menu Jadwal Hari Ini.',
                           style: AppTypography.smallHint,
+                        ),
+                      ),
+
+                    if (sched != null && sched.hasJournal)
+                      Container(
+                        margin: const EdgeInsets.only(top: AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.alertGreenBg,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.statusHadir.withValues(alpha: 0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_rounded,
+                              color: AppColors.statusHadir,
+                              size: 18,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                'Jurnal untuk jadwal ini sudah diisi hari ini. Setiap jadwal hanya dapat diisi 1 kali.',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.statusHadir,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -497,7 +593,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
 
                     // Camera Photo Activity Attachment (Real-time only)
                     Text(
-                      'Dokumentasi Foto Kegiatan Kelas (Opsional)',
+                      'Dokumentasi Foto Kegiatan Kelas (Wajib Realtime)',
                       style: AppTypography.cardTitle,
                     ),
                     const SizedBox(height: 2),
