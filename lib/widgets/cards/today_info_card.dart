@@ -289,16 +289,16 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
       decoration: BoxDecoration(
-        color: const Color(0xFF181B24),
+        color: AppColors.primaryIndigo,
         borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
         border: Border.all(
-          color: const Color(0xFF2E3344),
+          color: Colors.white.withValues(alpha: 0.15),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF0F172A).withValues(alpha: 0.16),
-            blurRadius: 12,
+            color: AppColors.primaryIndigo.withValues(alpha: 0.22),
+            blurRadius: 10,
             offset: const Offset(0, 4),
           ),
         ],
@@ -358,7 +358,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                     fontSize: 25,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
-                    color: const Color(0xFFC7D2FE),
+                    color: Colors.white,
                   ),
                 ),
                 const SizedBox(width: 3),
@@ -380,7 +380,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
             style: GoogleFonts.plusJakartaSans(
               fontSize: 9.5,
               fontWeight: FontWeight.w500,
-              color: const Color(0xFF64748B),
+              color: const Color(0xFF94A3B8),
             ),
           ),
         ],
@@ -401,7 +401,6 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
     final String titleText;
     final String bigDisplayText;
     final String captionText;
-    final Color accentColor;
     final IconData statusIcon;
 
     if (_isOngoingEvent && ongoingEvent != null) {
@@ -410,7 +409,6 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
           ? ongoingEvent.categoryLabel
           : 'Event Aktif';
       titleText = ongoingEvent.title;
-      accentColor = const Color(0xFFEA580C); // Warm Orange cerah
       statusIcon = Icons.wb_sunny_rounded;
 
       // Jika judul mengandung "UKK", prioritaskan teks UKK besar
@@ -434,7 +432,6 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
       titleText = upcomingEvent.title;
       bigDisplayText = '$daysUntil Hari';
       captionText = 'Tinggal $daysUntil hari lagi';
-      accentColor = const Color(0xFFEA580C); // Orange hangat
       statusIcon = Icons.hourglass_top_rounded;
     } else if (!isUnconfigured) {
       // 3. HARI SEKOLAH EFEKTIF (KBM NORMAL)
@@ -444,7 +441,6 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
       titleText = widget.todayEvent.title;
       bigDisplayText = 'KBM Aktif';
       captionText = widget.todayEvent.statusLabel ?? 'Kegiatan Sekolah';
-      accentColor = AppColors.secondaryTeal;
       statusIcon = Icons.event_available_rounded;
     } else {
       // 4. BELUM DIKONFIGURASI (EMPTY / UNCONFIGURED STATE)
@@ -452,12 +448,11 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
       titleText = widget.todayEvent.title;
       bigDisplayText = widget.todayEvent.statusLabel ?? 'Belum Dikonfigurasi';
       captionText = 'Ketuk untuk lihat kalender';
-      accentColor = const Color(0xFF64748B);
       statusIcon = Icons.event_note_outlined;
     }
 
     return Material(
-      color: Colors.white,
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
       elevation: 0,
       child: InkWell(
@@ -466,16 +461,16 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 12),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.primaryIndigo,
             borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
             border: Border.all(
-              color: const Color(0xFFE2E8F0),
+              color: Colors.white.withValues(alpha: 0.15),
               width: 1.2,
             ),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF64748B).withValues(alpha: 0.08),
-                blurRadius: 12,
+                color: AppColors.primaryIndigo.withValues(alpha: 0.22),
+                blurRadius: 10,
                 offset: const Offset(0, 4),
               ),
             ],
@@ -494,7 +489,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                       style: GoogleFonts.plusJakartaSans(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: accentColor,
+                        color: const Color(0xFFC7D2FE),
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
@@ -503,7 +498,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                   Icon(
                     statusIcon,
                     size: 16,
-                    color: const Color(0xFFF59E0B),
+                    color: const Color(0xFFFBBF24),
                   ),
                 ],
               ),
@@ -514,7 +509,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textSecondary,
+                  color: const Color(0xFFA5B4FC),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -532,7 +527,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                     fontSize: bigDisplayText.length > 10 ? 16 : 24,
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,
-                    color: accentColor,
+                    color: Colors.white,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -545,7 +540,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
                 style: GoogleFonts.plusJakartaSans(
                   fontSize: 9.5,
                   fontWeight: FontWeight.w500,
-                  color: AppColors.textTertiary,
+                  color: const Color(0xFF94A3B8),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

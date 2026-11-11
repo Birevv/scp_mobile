@@ -7,6 +7,7 @@ import '../../state/app_state.dart';
 import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/inputs/search_bar.dart';
 import '../../widgets/lists/student_list_item.dart';
+import '../../widgets/buttons/pill_button.dart';
 import '../../widgets/cards/soft_card.dart';
 import '../../widgets/cards/data_state_view.dart';
 
@@ -26,10 +27,12 @@ class WaliStudentsScreen extends StatefulWidget {
 
 class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
   String _searchQuery = '';
+  dynamic _selectedClassroomId;
 
   @override
   void initState() {
     super.initState();
+    _selectedClassroomId = widget.state.selectedHomeroomClassroomId;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (widget.state.homeroomStudents.isEmpty) {
         widget.state.fetchHomeroomStudentsData();
@@ -40,12 +43,43 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
   @override
   Widget build(BuildContext context) {
     final students = widget.state.homeroomStudents;
+    final isBk = widget.state.currentUser.role == UserRole.guruBk;
+    final availableClasses = isBk ? widget.state.assignedClassrooms : const <ReferenceOption>[];
+
+    final selectedClass = isBk
+        ? availableClasses
+            .where((c) => c.id.toString() == _selectedClassroomId?.toString())
+            .firstOrNull
+        : null;
 
     final filtered = students.where((s) {
+      if (isBk && _selectedClassroomId != null) {
+        final matchesId = s.classroomId != null &&
+            s.classroomId.toString() == _selectedClassroomId.toString();
+        final matchesName = selectedClass != null &&
+            s.className.toLowerCase() == selectedClass.name.toLowerCase();
+        if (!matchesId && !matchesName) return false;
+      }
       if (_searchQuery.isEmpty) return true;
       final q = _searchQuery.toLowerCase();
       return s.name.toLowerCase().contains(q) || s.nisn.toLowerCase().contains(q);
     }).toList();
+
+    final String subtitle;
+    if (isBk) {
+      if (selectedClass != null) {
+        subtitle = 'Kelas ${selectedClass.name} • ${filtered.length} Siswa';
+      } else {
+        subtitle = 'Semua Siswa Binaan (${availableClasses.length} Kelas) • ${students.length} Siswa';
+      }
+    } else {
+      final className = widget.state.currentUser.className.isNotEmpty
+          ? widget.state.currentUser.className
+          : (widget.state.assignedClassrooms.isNotEmpty
+              ? widget.state.assignedClassrooms.first.name
+              : 'Kelas Binaan');
+      subtitle = '$className • ${students.length} Siswa Terdaftar';
+    }
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -54,7 +88,7 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
           // Header with Gradient
           HeaderWithGradient(
             userName: 'Daftar Siswa Binaan',
-            userSubtitle: '${widget.state.currentUser.className} • ${students.length} Siswa Terdaftar',
+            userSubtitle: subtitle,
             leading: widget.onBack != null
                 ? IconButton(
                     icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
@@ -83,7 +117,54 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                       onChanged: (val) => setState(() => _searchQuery = val.trim()),
                     ),
 
-                    const SizedBox(height: AppSpacing.lg),
+                    const SizedBox(height: AppSpacing.md),
+
+                    // Filter Chips: Khusus Guru BK yang mengampu banyak kelas
+                    if (isBk && availableClasses.length > 1) ...[
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: AppSpacing.sm),
+                              child: PillButton(
+                                label: 'Semua Kelas',
+                                count: '${students.length}',
+                                isActive: _selectedClassroomId == null,
+                                activeColor: AppColors.primaryIndigo,
+                                onPressed: () {
+                                  setState(() => _selectedClassroomId = null);
+                                  widget.state.selectHomeroomClassroom(null);
+                                },
+                              ),
+                            ),
+                            ...availableClasses.map((cls) {
+                              final isSelected = _selectedClassroomId != null &&
+                                  _selectedClassroomId.toString() == cls.id.toString();
+                              final classCount = students.where((s) =>
+                                  (s.classroomId != null &&
+                                      s.classroomId.toString() == cls.id.toString()) ||
+                                  s.className.toLowerCase() == cls.name.toLowerCase()).length;
+
+                              return Padding(
+                                padding: const EdgeInsets.only(right: AppSpacing.sm),
+                                child: PillButton(
+                                  label: cls.name,
+                                  count: '$classCount',
+                                  isActive: isSelected,
+                                  activeColor: AppColors.primaryIndigo,
+                                  onPressed: () {
+                                    setState(() => _selectedClassroomId = cls.id);
+                                    widget.state.selectHomeroomClassroom(cls.id);
+                                  },
+                                ),
+                              );
+                            }),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.md),
+                    ],
 
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -136,10 +217,15 @@ class _WaliStudentsScreenState extends State<WaliStudentsScreen> {
                         itemBuilder: (context, index) {
                           final student = filtered[index];
                           final bool hasAttention = student.alpa >= 3;
+                          final String classPrefix = isBk &&
+                                  student.className.isNotEmpty &&
+                                  student.className != '-'
+                              ? '${student.className} • '
+                              : '';
 
                           return StudentListItem(
                             studentName: student.name,
-                            nisn: 'NISN. ${student.nisn}',
+                            nisn: '${classPrefix}NISN. ${student.nisn}',
                             statusBadge: student.todayStatus.label,
                             statusBadgeColor: student.todayStatus.color,
                             statusBadgeBgColor: student.todayStatus.bgColor,

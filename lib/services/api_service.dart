@@ -478,15 +478,22 @@ class ApiService {
   // HOMEROOM & BK ENDPOINTS (`/api/homeroom/*`)
   // ===========================================================================
 
-  Future<ApiResponse> fetchHomeroomDashboard({int? classroomId}) {
+  Future<ApiResponse> fetchHomeroomClassrooms() =>
+      get('/homeroom/classrooms');
+
+  Future<ApiResponse> fetchHomeroomDashboard({dynamic classroomId}) {
     final q = <String, String>{};
-    if (classroomId != null) q['classroom_id'] = classroomId.toString();
-    return get('/homeroom/dashboard', query: q);
+    if (classroomId != null && classroomId != 'all') {
+      q['classroom_id'] = classroomId.toString();
+    }
+    return get('/homeroom/dashboard', query: q.isNotEmpty ? q : null);
   }
 
-  Future<ApiResponse> fetchHomeroomStudents({int? classroomId}) {
+  Future<ApiResponse> fetchHomeroomStudents({dynamic classroomId}) {
     final q = <String, String>{};
-    if (classroomId != null) q['classroom_id'] = classroomId.toString();
+    if (classroomId != null && classroomId != 'all') {
+      q['classroom_id'] = classroomId.toString();
+    }
     return get('/homeroom/students', query: q.isNotEmpty ? q : null);
   }
 

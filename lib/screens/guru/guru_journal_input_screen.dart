@@ -53,15 +53,108 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                 : null));
 
     if (sched != null) {
-      if (widget.state.classRoster.isEmpty) {
-        await widget.state.fetchScheduleStudentsRoster(sched.id);
-      }
+      await widget.state.fetchScheduleStudentsRoster(sched.id);
       if (mounted) {
         setState(() {
           _roster = widget.state.classRoster.map((s) => s.copyWith()).toList();
         });
       }
     }
+  }
+
+  void _showSchedulePicker(BuildContext context) {
+    final schedules = widget.state.todaySchedules.isNotEmpty
+        ? widget.state.todaySchedules
+        : widget.state.teachingSchedules;
+
+    if (schedules.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Pilih Jadwal Mengajar',
+                        style: AppTypography.cardTitle.copyWith(fontSize: 16),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close_rounded, size: 20),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: schedules.length,
+                    itemBuilder: (_, index) {
+                      final item = schedules[index];
+                      final isSelected = widget.state.selectedJournalSchedule?.id == item.id;
+                      return ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: item.hasJournal
+                              ? AppColors.alertGreenBg
+                              : AppColors.alertAmberBg,
+                          child: Icon(
+                            item.hasJournal
+                                ? Icons.check_circle_rounded
+                                : Icons.edit_note_rounded,
+                            color: item.hasJournal
+                                ? AppColors.statusHadir
+                                : AppColors.statusSakit,
+                            size: 20,
+                          ),
+                        ),
+                        title: Text(
+                          item.subjectName,
+                          style: AppTypography.cardTitle.copyWith(fontSize: 14),
+                        ),
+                        subtitle: Text(
+                          '${item.className} • ${item.roomName} (${item.startTime} - ${item.endTime} WIB)',
+                          style: AppTypography.caption,
+                        ),
+                        trailing: isSelected
+                            ? const Icon(Icons.check_rounded, color: AppColors.primaryIndigo)
+                            : null,
+                        onTap: () async {
+                          Navigator.pop(ctx);
+                          widget.state.selectScheduleForJournal(item);
+                          await widget.state.fetchScheduleStudentsRoster(item.id);
+                          if (mounted) {
+                            setState(() {
+                              _roster = widget.state.classRoster
+                                  .map((s) => s.copyWith())
+                                  .toList();
+                            });
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
@@ -293,6 +386,31 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                                 ],
                               ),
                             ),
+                            if ((widget.state.todaySchedules.length > 1) ||
+                                (widget.state.teachingSchedules.length > 1))
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                onPressed: () => _showSchedulePicker(context),
+                                icon: const Icon(
+                                  Icons.swap_horiz_rounded,
+                                  size: 16,
+                                  color: AppColors.primaryIndigo,
+                                ),
+                                label: Text(
+                                  'Ganti',
+                                  style: AppTypography.caption.copyWith(
+                                    color: AppColors.primaryIndigo,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       )

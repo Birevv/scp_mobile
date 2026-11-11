@@ -14,6 +14,8 @@ enum UserRole {
   bool get isHomeroomOrBk =>
       this == UserRole.waliKelas || this == UserRole.guruBk;
 
+  bool get isTeacher => this == UserRole.guru || this == UserRole.waliKelas;
+
   bool get isMobileSupported => this != UserRole.unsupported;
 
   static UserRole fromApiRole(String? roleName) {
@@ -267,6 +269,8 @@ class HomeroomAttendanceSummary {
   final int totalStudents;
   final double percentage;
   final int pendingCount;
+  final List<ReferenceOption> classrooms;
+  final int? selectedClassroomId;
 
   const HomeroomAttendanceSummary({
     this.classroomName = '-',
@@ -277,6 +281,8 @@ class HomeroomAttendanceSummary {
     this.totalStudents = 0,
     this.percentage = 0.0,
     this.pendingCount = 0,
+    this.classrooms = const [],
+    this.selectedClassroomId,
   });
 
   factory HomeroomAttendanceSummary.fromDashboardJson(
@@ -285,6 +291,12 @@ class HomeroomAttendanceSummary {
     final att = json['attendance_today'] is Map<String, dynamic>
         ? json['attendance_today'] as Map<String, dynamic>
         : <String, dynamic>{};
+    final rawCls = json['classrooms'];
+    final parsedCls = rawCls is List
+        ? rawCls
+            .map((c) => ReferenceOption.fromJson(c as Map<String, dynamic>))
+            .toList()
+        : const <ReferenceOption>[];
     return HomeroomAttendanceSummary(
       classroomName: (json['classroom_name'] ?? '-').toString(),
       hadir: (att['hadir'] as num?)?.toInt() ?? 0,
@@ -296,6 +308,8 @@ class HomeroomAttendanceSummary {
           (att['percentage'] as num? ?? att['precentage'] as num?)?.toDouble() ??
               0.0,
       pendingCount: (json['pending_count'] as num?)?.toInt() ?? 0,
+      classrooms: parsedCls,
+      selectedClassroomId: (json['selected_classroom_id'] as num?)?.toInt(),
     );
   }
 }
@@ -305,6 +319,7 @@ class HomeroomStudent {
   final String name;
   final String nisn;
   final String className;
+  final int? classroomId;
   final int hadir;
   final int sakit;
   final int izin;
@@ -320,6 +335,7 @@ class HomeroomStudent {
     required this.name,
     required this.nisn,
     required this.className,
+    this.classroomId,
     this.hadir = 0,
     this.sakit = 0,
     this.izin = 0,
@@ -339,6 +355,9 @@ class HomeroomStudent {
       name: (json['student_name'] ?? json['full_name'] ?? '-').toString(),
       nisn: (json['identity_number'] ?? json['nisn'] ?? '-').toString(),
       className: (json['classroom_name'] ?? '-').toString(),
+      classroomId: json['classroom_id'] != null
+          ? int.tryParse(json['classroom_id'].toString())
+          : null,
       hadir: (json['hadir'] as num?)?.toInt() ?? 0,
       sakit: (json['sakit'] as num?)?.toInt() ?? 0,
       izin: (json['izin'] as num?)?.toInt() ?? 0,
@@ -364,6 +383,7 @@ class UserProfile {
   final String email;
   final String phone;
   final String avatarUrl;
+  final List<ReferenceOption> assignedClassrooms;
 
   const UserProfile({
     required this.id,
@@ -377,6 +397,7 @@ class UserProfile {
     required this.email,
     this.phone = '-',
     required this.avatarUrl,
+    this.assignedClassrooms = const [],
   });
 
   UserProfile copyWith({
@@ -391,6 +412,7 @@ class UserProfile {
     String? email,
     String? phone,
     String? avatarUrl,
+    List<ReferenceOption>? assignedClassrooms,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -404,6 +426,7 @@ class UserProfile {
       email: email ?? this.email,
       phone: phone ?? this.phone,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      assignedClassrooms: assignedClassrooms ?? this.assignedClassrooms,
     );
   }
 
@@ -416,6 +439,13 @@ class UserProfile {
     final effectiveClassOrAssignment = classroom.isNotEmpty
         ? classroom
         : (assignment.isNotEmpty ? assignment : roleStr);
+
+    final rawClassrooms = json['classrooms'];
+    final assignedClassrooms = rawClassrooms is List
+        ? rawClassrooms
+            .map((c) => ReferenceOption.fromJson(c as Map<String, dynamic>))
+            .toList()
+        : <ReferenceOption>[];
 
     return UserProfile(
       id: (json['id'] ?? '').toString(),
@@ -432,6 +462,7 @@ class UserProfile {
       email: (json['email'] ?? '-').toString(),
       phone: (json['phone'] ?? '-').toString(),
       avatarUrl: (json['profile_photo_url'] ?? '').toString(),
+      assignedClassrooms: assignedClassrooms,
     );
   }
 }

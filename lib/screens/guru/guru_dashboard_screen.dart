@@ -307,7 +307,7 @@ class GuruDashboardScreen extends StatelessWidget {
                     const SizedBox(height: AppSpacing.lg),
                   ],
 
-                  // 4. AKSES CEPAT (Grid 4 Menu — Tambah Jadwal non-aktif bila dikunci Waka Kurikulum)
+                  // 4. AKSES CEPAT (Grid 4 Menu Guru)
                   MenuGrid(
                     sectionTitle: 'Akses Cepat',
                     items: [
@@ -334,18 +334,6 @@ class GuruDashboardScreen extends StatelessWidget {
                         onTap: () => onNavigate('guru_journal_history'),
                       ),
                       MenuItemData(
-                        label: state.isScheduleLocked
-                            ? 'Jadwal Dikunci'
-                            : 'Tambah Jadwal',
-                        icon: Icons.post_add_rounded,
-                        iconColor: AppColors.secondaryTeal,
-                        bgColor: AppColors.lightTealBg,
-                        isLocked: state.isScheduleLocked,
-                        onTap: state.isScheduleLocked
-                            ? null
-                            : () => onNavigate('guru_schedule_input'),
-                      ),
-                      MenuItemData(
                         label: 'Kalender',
                         icon: Icons.date_range_rounded,
                         iconColor: AppColors.brandNavy,
@@ -354,40 +342,6 @@ class GuruDashboardScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-
-                  if (state.isScheduleLocked) ...[
-                    const SizedBox(height: 10),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.statusPendingBg,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: AppColors.alertAmberBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.lock_clock_rounded,
-                            size: 16,
-                            color: AppColors.statusPendingText,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Penambahan jadwal dinonaktifkan karena jadwal sedang dikunci oleh Waka Kurikulum.',
-                              style: AppTypography.microBadge.copyWith(
-                                color: AppColors.statusPendingText,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
 
                   const SizedBox(height: AppSpacing.xl),
 

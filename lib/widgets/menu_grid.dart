@@ -26,10 +26,12 @@ class MenuItemData {
   });
 }
 
-/// MenuGrid - Grid Akses Cepat (3 Menu di Atas, 2 Menu di Bawah)
-/// Mengembalikan tampilan ikon klasik seperti semula:
-/// - 3 menu di baris pertama terdistribusi rata
-/// - 2 menu di baris kedua terdistribusi seimbang dan simetris
+/// MenuGrid - Grid Akses Cepat
+/// Mendukung layout responsif:
+/// - 4 menu: 1 baris 4 menu rata
+/// - 5 menu: 3 menu di baris pertama, 2 menu di baris kedua
+/// - 8 menu: 2 baris x 4 menu rata
+/// - Lainnya: Wrap dengan distribusi proporsional
 class MenuGrid extends StatelessWidget {
   final List<MenuItemData> items;
   final String? sectionTitle;
@@ -75,6 +77,18 @@ class MenuGrid extends StatelessWidget {
             builder: (context, constraints) {
               final double totalWidth = constraints.maxWidth;
 
+              // Bila 4 menu: 1 baris 4 menu rata
+              if (items.length == 4) {
+                final double itemWidth = (totalWidth - 24) / 4;
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: items
+                      .map((item) => _buildGridItem(context, item, itemWidth))
+                      .toList(),
+                );
+              }
+
               // Bila 5 menu: 3 menu di atas, 2 menu di bawah
               if (items.length == 5) {
                 final topItems = items.sublist(0, 3);
@@ -95,6 +109,33 @@ class MenuGrid extends StatelessWidget {
                     // Baris 2: 2 Menu di Bawah (Seimbang & Proporsional)
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: bottomItems
+                          .map((item) => _buildGridItem(context, item, itemWidth))
+                          .toList(),
+                    ),
+                  ],
+                );
+              }
+
+              // Bila 8 menu: 2 baris x 4 menu rata
+              if (items.length == 8) {
+                final topItems = items.sublist(0, 4);
+                final bottomItems = items.sublist(4, 8);
+                final double itemWidth = (totalWidth - 24) / 4;
+
+                return Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: topItems
+                          .map((item) => _buildGridItem(context, item, itemWidth))
+                          .toList(),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: bottomItems
                           .map((item) => _buildGridItem(context, item, itemWidth))

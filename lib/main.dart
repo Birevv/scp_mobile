@@ -406,9 +406,12 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'guru_my_schedule':
         return GuruMyScheduleScreen(
           state: widget.state,
-          onBack: null,
-          onAddSchedule: () => _navigateTo('guru_schedule_input'),
-          onFillJournal: (schedule) => _navigateTo('guru_journal_input'),
+          onBack: _routeHistory.isNotEmpty ? _navigateBack : null,
+          onAddSchedule: null,
+          onFillJournal: (schedule) {
+            widget.state.selectScheduleForJournal(schedule);
+            _navigateTo('guru_journal_input');
+          },
         );
 
       case 'guru_journal_input':
@@ -421,7 +424,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case 'guru_journal_history':
         return GuruJournalHistoryScreen(
           state: widget.state,
-          onBack: null,
+          onBack: _routeHistory.isNotEmpty ? _navigateBack : null,
         );
 
       // Wali Kelas & Guru BK screens

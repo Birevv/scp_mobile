@@ -47,6 +47,7 @@ class AppState extends ChangeNotifier {
     List<HomeroomStudent>? homeroomStudents,
     List<TeachingSchedule>? teachingSchedules,
     List<AcademicEventInfo>? calendarEvents,
+    List<ReferenceOption>? classrooms,
   }) {
     final state = AppState(
       apiService: apiService,
@@ -56,6 +57,10 @@ class AppState extends ChangeNotifier {
     if (user != null) {
       state._currentUser = user;
       state._authStatus = AuthStatus.authenticated;
+    }
+    if (classrooms != null) {
+      state._classrooms = classrooms;
+      state._assignedClassrooms = classrooms;
     }
     if (studentSummary != null) {
       state._studentSummary = studentSummary;
@@ -285,6 +290,13 @@ class AppState extends ChangeNotifier {
   List<ReferenceOption> _classrooms = [];
   List<ReferenceOption> get classrooms => _classrooms;
 
+  List<ReferenceOption> _assignedClassrooms = [];
+  List<ReferenceOption> get assignedClassrooms => _assignedClassrooms.isNotEmpty
+      ? _assignedClassrooms
+      : (_currentUser != null && _currentUser!.assignedClassrooms.isNotEmpty
+          ? _currentUser!.assignedClassrooms
+          : _classrooms);
+
   List<ReferenceOption> _rooms = [];
   List<ReferenceOption> get rooms => _rooms;
 
@@ -352,7 +364,7 @@ class AppState extends ChangeNotifier {
 
         final nextSchedule =
             (i + 1 < _todaySchedules.length) ? _todaySchedules[i + 1] : null;
-        final isTeacher = _currentUser?.role == UserRole.guru;
+        final isTeacher = _currentUser?.role.isTeacher ?? false;
 
         final title =
             '15 Menit Menuju Pergantian Jam (Selesai ${schedule.endTime} WIB)';
@@ -386,7 +398,7 @@ class AppState extends ChangeNotifier {
     // Minta izin notifikasi jika belum diizinkan (khusus Android 13+)
     LocalNotificationService.requestPermissions();
 
-    final isTeacher = _currentUser?.role == UserRole.guru;
+    final isTeacher = _currentUser?.role.isTeacher ?? false;
     final activeList =
         _todaySchedules.isNotEmpty ? _todaySchedules : _teachingSchedules;
     final current = activeList.isNotEmpty ? activeList.first : null;
@@ -624,12 +636,27 @@ class AppState extends ChangeNotifier {
         ]);
         break;
       case UserRole.waliKelas:
+        await Future.wait([
+          fetchHomeroomDashboardData(),
+          fetchHomeroomStudentsData(),
+          fetchHomeroomLeavesData(),
+          fetchAcademicCalendarEvents(),
+          fetchTeacherDashboardData(),
+          fetchTeacherSchedulesData(),
+          fetchTeacherJournalsData(),
+          fetchReferenceData(),
+        ]);
+        break;
       case UserRole.guruBk:
         await Future.wait([
           fetchHomeroomDashboardData(),
           fetchHomeroomStudentsData(),
           fetchHomeroomLeavesData(),
           fetchAcademicCalendarEvents(),
+          fetchTeacherDashboardData(),
+          fetchTeacherSchedulesData(),
+          fetchTeacherJournalsData(),
+          fetchReferenceData(),
         ]);
         break;
       case UserRole.unsupported:
@@ -894,7 +921,9 @@ class AppState extends ChangeNotifier {
     final res = await _apiService.fetchTeacherDashboard();
     if (!res.success) {
       _isLoadingDashboard = false;
-      _dashboardError = res.message;
+      if (!currentRole.isHomeroomOrBk) {
+        _dashboardError = res.message;
+      }
       notifyListeners();
       return;
     }
@@ -1170,6 +1199,7 @@ class AppState extends ChangeNotifier {
       await Future.wait([
         fetchTeacherDashboardData(),
         fetchTeacherJournalsData(),
+        if (_currentUser?.role == UserRole.waliKelas) fetchHomeroomDashboardData(),
       ]);
     }
     return res;
@@ -1214,23 +1244,30 @@ class AppState extends ChangeNotifier {
   // ===========================================================================
   // 7. HOMEROOM & GURU BK API INTEGRATIONS (`/api/homeroom/*`)
   // ===========================================================================
-  Future<void> fetchHomeroomDashboardData({int? classroomId}) async {
+  Future<void> fetchHomeroomDashboardData({dynamic classroomId}) async {
     _isLoadingDashboard = true;
     _dashboardError = null;
     if (classroomId != null) {
-      _selectedHomeroomClassroomId = classroomId;
+      if (classroomId == 'all' || classroomId == 0) {
+        _selectedHomeroomClassroomId = null;
+      } else if (classroomId is int) {
+        _selectedHomeroomClassroomId = classroomId;
+      } else {
+        _selectedHomeroomClassroomId = int.tryParse(classroomId.toString());
+      }
     }
     notifyListeners();
 
-    // For Guru BK, load classrooms reference if not yet loaded so BK can select a classroom
-    if (currentRole == UserRole.guruBk && _classrooms.isEmpty) {
-      final clsRes = await _apiService.fetchClassrooms();
+    // Load assigned classrooms for Homeroom / BK if not yet populated
+    if (_assignedClassrooms.isEmpty) {
+      final clsRes = await _apiService.fetchHomeroomClassrooms();
       if (clsRes.success) {
-        _classrooms = _extractList(clsRes.data)
+        final list = _extractList(clsRes.data)
             .map(ReferenceOption.fromJson)
             .toList();
-        if (_selectedHomeroomClassroomId == null && _classrooms.isNotEmpty) {
-          _selectedHomeroomClassroomId = _classrooms.first.id;
+        if (list.isNotEmpty) {
+          _assignedClassrooms = list;
+          _classrooms = list;
         }
       }
     }
@@ -1243,7 +1280,7 @@ class AppState extends ChangeNotifier {
       // If Guru BK has no classrooms in DB or 403, still allow viewing leave requests if leaves succeed
       if (currentRole == UserRole.guruBk && dashRes.statusCode == 403) {
         _homeroomSummary = const HomeroomAttendanceSummary(
-          classroomName: 'Seluruh Kelas (Guru BK)',
+          classroomName: 'Semua Kelas Binaan',
         );
       } else {
         _isLoadingDashboard = false;
@@ -1255,6 +1292,11 @@ class AppState extends ChangeNotifier {
       final map = dashRes.data as Map<String, dynamic>;
       _homeroomSummary = HomeroomAttendanceSummary.fromDashboardJson(map);
       _pendingLeaveCount = _homeroomSummary.pendingCount;
+
+      if (_homeroomSummary.classrooms.isNotEmpty) {
+        _assignedClassrooms = _homeroomSummary.classrooms;
+        _classrooms = _assignedClassrooms;
+      }
 
       final clsName = _homeroomSummary.classroomName;
       if (clsName.isNotEmpty && clsName != '-' && _currentUser != null) {
@@ -1278,7 +1320,7 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> fetchHomeroomStudentsData({int? classroomId}) async {
+  Future<void> fetchHomeroomStudentsData({dynamic classroomId}) async {
     _isLoadingHomeroomStudents = true;
     _homeroomStudentsError = null;
     notifyListeners();
@@ -1292,6 +1334,16 @@ class AppState extends ChangeNotifier {
       _homeroomStudentsError = res.message;
       notifyListeners();
       return;
+    }
+
+    if (res.data is Map<String, dynamic> && res.data['classrooms'] != null) {
+      final clsList = _extractList(res.data['classrooms'])
+          .map(ReferenceOption.fromJson)
+          .toList();
+      if (clsList.isNotEmpty) {
+        _assignedClassrooms = clsList;
+        _classrooms = clsList;
+      }
     }
 
     List<Map<String, dynamic>> list = [];
@@ -1323,6 +1375,18 @@ class AppState extends ChangeNotifier {
 
     _isLoadingHomeroomStudents = false;
     notifyListeners();
+  }
+
+  void selectHomeroomClassroom(dynamic classroomId) {
+    if (classroomId == null || classroomId == 'all' || classroomId == 0) {
+      _selectedHomeroomClassroomId = null;
+    } else if (classroomId is int) {
+      _selectedHomeroomClassroomId = classroomId;
+    } else {
+      _selectedHomeroomClassroomId = int.tryParse(classroomId.toString());
+    }
+    notifyListeners();
+    fetchHomeroomDashboardData(classroomId: _selectedHomeroomClassroomId);
   }
 
   Future<void> fetchAcademicCalendarEvents({

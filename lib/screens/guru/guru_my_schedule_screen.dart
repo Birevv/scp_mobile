@@ -13,14 +13,14 @@ import '../../widgets/lists/vertical_timeline_schedule.dart';
 class GuruMyScheduleScreen extends StatefulWidget {
   final AppState state;
   final VoidCallback? onBack;
-  final VoidCallback onAddSchedule;
+  final VoidCallback? onAddSchedule;
   final void Function(TeachingSchedule schedule)? onFillJournal;
 
   const GuruMyScheduleScreen({
     super.key,
     required this.state,
     this.onBack,
-    required this.onAddSchedule,
+    this.onAddSchedule,
     this.onFillJournal,
   });
 
@@ -88,7 +88,7 @@ class _GuruMyScheduleScreenState extends State<GuruMyScheduleScreen> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      floatingActionButton: widget.state.isScheduleLocked
+      floatingActionButton: (widget.onAddSchedule == null || widget.state.isScheduleLocked)
           ? null
           : FloatingActionButton.extended(
               backgroundColor: AppColors.primaryIndigo,
@@ -371,7 +371,9 @@ class _GuruMyScheduleScreenState extends State<GuruMyScheduleScreen> {
                     cycleLabel: currentCycle.label,
                     isTeacher: true,
                     onActionTap: widget.onFillJournal,
-                    onAddTap: widget.state.isScheduleLocked ? null : widget.onAddSchedule,
+                    onAddTap: (widget.onAddSchedule == null || widget.state.isScheduleLocked)
+                        ? null
+                        : widget.onAddSchedule,
                   ),
 
                   const SizedBox(height: 80),
