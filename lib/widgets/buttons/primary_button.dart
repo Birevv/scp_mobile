@@ -27,6 +27,11 @@ class PrimaryButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isEnabled = !isLoading && onPressed != null;
+    final Color effectiveForeground = isEnabled
+        ? (foregroundColor ?? AppColors.white)
+        : AppColors.textSecondary;
+
     return SizedBox(
       width: width ?? double.infinity,
       height: height,
@@ -35,6 +40,7 @@ class PrimaryButton extends StatelessWidget {
           backgroundColor: backgroundColor ?? AppColors.primaryIndigo,
           foregroundColor: foregroundColor ?? AppColors.white,
           disabledBackgroundColor: AppColors.border,
+          disabledForegroundColor: AppColors.textSecondary,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppSpacing.radiusLarge),
           ),
@@ -55,14 +61,14 @@ class PrimaryButton extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (icon != null) ...[
-                    Icon(icon, size: 18),
+                    Icon(icon, size: 18, color: effectiveForeground),
                     const SizedBox(width: AppSpacing.sm),
                   ],
                   Flexible(
                     child: Text(
                       label,
                       style: AppTypography.labelButton.copyWith(
-                        color: foregroundColor ?? AppColors.white,
+                        color: effectiveForeground,
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,

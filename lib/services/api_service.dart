@@ -486,6 +486,56 @@ class ApiService {
     );
   }
 
+  Future<ApiResponse> fetchTeacherJournalDetail(String journalId) =>
+      get('/teacher/journals/$journalId');
+
+  Future<ApiResponse> updateTeacherJournal({
+    required String journalId,
+    required String teachingMaterial,
+    required String notes,
+    List<Map<String, dynamic>>? attendances,
+    String? photoFilePath,
+    Uint8List? photoBytes,
+    String? photoFileName,
+  }) {
+    final hasNewPhoto =
+        (photoFilePath != null && photoFilePath.isNotEmpty) || photoBytes != null;
+
+    if (hasNewPhoto) {
+      final fields = <String, String>{
+        'teaching_material': teachingMaterial,
+        'notes': notes,
+      };
+
+      if (attendances != null) {
+        for (var i = 0; i < attendances.length; i++) {
+          final att = attendances[i];
+          fields['attendances[$i][student_id]'] = att['student_id'].toString();
+          fields['attendances[$i][status]'] = att['status'].toString();
+          if (att['notes'] != null && att['notes'].toString().isNotEmpty) {
+            fields['attendances[$i][notes]'] = att['notes'].toString();
+          }
+        }
+      }
+
+      return postMultipart(
+        '/teacher/journals/$journalId',
+        fields: fields,
+        fileField: 'activity_photo',
+        filePath: photoFilePath,
+        fileBytes: photoBytes,
+        fileName: photoFileName ?? 'activity_photo.jpg',
+      );
+    }
+
+    return put('/teacher/journals/$journalId', {
+      'teaching_material': teachingMaterial,
+      'notes': notes,
+      if (attendances != null && attendances.isNotEmpty)
+        'attendances': attendances,
+    });
+  }
+
   // ===========================================================================
   // HOMEROOM & BK ENDPOINTS (`/api/homeroom/*`)
   // ===========================================================================

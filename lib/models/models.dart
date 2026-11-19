@@ -590,6 +590,33 @@ class StudentAttendance {
       teacherName: teacherName,
     );
   }
+
+  factory StudentAttendance.fromJournalAttendanceJson(
+    Map<String, dynamic> json, {
+    String className = '-',
+    String subjectName = '-',
+    String teacherName = '-',
+    DateTime? date,
+  }) {
+    final studentId = (json['student_id'] as num?)?.toInt() ??
+        int.tryParse((json['student_id'] ?? '').toString());
+    final noteStr = json['notes']?.toString();
+    return StudentAttendance(
+      id: (json['id'] ?? studentId ?? '').toString(),
+      studentId: studentId,
+      studentName: (json['student_name'] ?? json['full_name'] ?? '-').toString(),
+      nisn: (json['identity_number'] ?? '-').toString(),
+      className: className,
+      status: AttendanceStatus.fromString(json['status']?.toString()),
+      isAutoSynced: false,
+      leaveReason: noteStr,
+      notes: noteStr,
+      date: date ?? DateTime.now(),
+      time: '-',
+      subject: subjectName,
+      teacherName: teacherName,
+    );
+  }
 }
 
 class LeaveRequest {
@@ -733,6 +760,14 @@ class TeachingSchedule {
   final CycleType cycle;
   final String teacherName;
   final bool hasJournal;
+  final bool? canFillOverride;
+  final bool isFuture;
+  final bool isExpired;
+  final bool isInactiveCycle;
+  final String? targetDate;
+  final String? targetDateFormatted;
+  final String? status;
+  final String? statusLabel;
 
   const TeachingSchedule({
     required this.id,
@@ -745,7 +780,159 @@ class TeachingSchedule {
     required this.cycle,
     required this.teacherName,
     this.hasJournal = false,
+    this.canFillOverride,
+    this.isFuture = false,
+    this.isExpired = false,
+    this.isInactiveCycle = false,
+    this.targetDate,
+    this.targetDateFormatted,
+    this.status,
+    this.statusLabel,
   });
+
+  static int? dayIndex(String dayName) {
+    switch (dayName.trim().toLowerCase()) {
+      case 'senin':
+        return DateTime.monday;
+      case 'selasa':
+        return DateTime.tuesday;
+      case 'rabu':
+        return DateTime.wednesday;
+      case 'kamis':
+        return DateTime.thursday;
+      case 'jumat':
+        return DateTime.friday;
+      case 'sabtu':
+        return DateTime.saturday;
+      case 'minggu':
+        return DateTime.sunday;
+      default:
+        return null;
+    }
+  }
+
+  static String indonesianDayName(DateTime date) {
+    switch (date.weekday) {
+      case DateTime.monday:
+        return 'Senin';
+      case DateTime.tuesday:
+        return 'Selasa';
+      case DateTime.wednesday:
+        return 'Rabu';
+      case DateTime.thursday:
+        return 'Kamis';
+      case DateTime.friday:
+        return 'Jumat';
+      case DateTime.saturday:
+        return 'Sabtu';
+      case DateTime.sunday:
+      default:
+        return 'Minggu';
+    }
+  }
+
+  static DateTime resolveTargetDateForDay(String dayName, {DateTime? now}) {
+    final current = now ?? DateTime.now();
+    final today = DateTime(current.year, current.month, current.day);
+    final mondayOffset = today.weekday - DateTime.monday;
+    final currentWeekMonday = today.subtract(Duration(days: mondayOffset));
+    final weekStart = today.weekday >= DateTime.saturday
+        ? currentWeekMonday.add(const Duration(days: 7))
+        : currentWeekMonday;
+    final targetIdx = dayIndex(dayName) ?? DateTime.monday;
+    return weekStart.add(Duration(days: targetIdx - 1));
+  }
+
+  static String formatShortIndonesianDate(DateTime date) {
+    const months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'Mei',
+      'Jun',
+      'Jul',
+      'Agu',
+      'Sep',
+      'Okt',
+      'Nov',
+      'Des',
+    ];
+    final dd = date.day.toString().padLeft(2, '0');
+    final mmm = months[(date.month - 1).clamp(0, 11)];
+    return '$dd $mmm ${date.year}';
+  }
+
+  bool isCycleActive(CycleType activeCycle) {
+    if (isInactiveCycle) return false;
+    return cycle == activeCycle;
+  }
+
+  bool isFutureSchedule({DateTime? now}) {
+    if (isFuture) return true;
+    if (canFillOverride == true) return false;
+    final idx = dayIndex(day);
+    if (idx == null) return false;
+    final current = now ?? DateTime.now();
+    final today = DateTime(current.year, current.month, current.day);
+    final target = resolveTargetDateForDay(day, now: current);
+    return target.isAfter(today);
+  }
+
+  bool isExpiredSchedule({DateTime? now}) {
+    if (hasJournal) return false;
+    if (isExpired) return true;
+    if (canFillOverride == true) return false;
+    final idx = dayIndex(day);
+    if (idx == null) return false;
+    final current = now ?? DateTime.now();
+    final today = DateTime(current.year, current.month, current.day);
+    final target = resolveTargetDateForDay(day, now: current);
+    return target.isBefore(today);
+  }
+
+  bool canFillJournal({
+    required CycleType activeCycle,
+    DateTime? now,
+    bool allowWithoutDayMatch = false,
+  }) {
+    if (hasJournal) return false;
+    if (!isCycleActive(activeCycle)) return false;
+    if (canFillOverride != null) return canFillOverride!;
+    if (isFuture || isExpired) return false;
+    if (allowWithoutDayMatch) return true;
+    final current = now ?? DateTime.now();
+    final todayName = indonesianDayName(current);
+    return day.trim().toLowerCase() == todayName.toLowerCase();
+  }
+
+  String resolvedTargetDateLabel({DateTime? now}) {
+    if (targetDateFormatted != null && targetDateFormatted!.trim().isNotEmpty) {
+      return targetDateFormatted!.trim();
+    }
+    return formatShortIndonesianDate(resolveTargetDateForDay(day, now: now));
+  }
+
+  static int? parseTimeToMinutes(String raw) {
+    final cleaned = raw.trim();
+    if (cleaned.isEmpty) return null;
+    final parts = cleaned.split(':');
+    if (parts.length < 2) return null;
+    final hour = int.tryParse(parts[0].trim());
+    final minute = int.tryParse(parts[1].trim());
+    if (hour == null || minute == null) return null;
+    if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+    return hour * 60 + minute;
+  }
+
+  bool isOngoingAt(DateTime now) {
+    final startMinutes = parseTimeToMinutes(startTime);
+    final endMinutes = parseTimeToMinutes(endTime);
+    if (startMinutes == null || endMinutes == null) return false;
+    if (endMinutes <= startMinutes) return false;
+    final nowMinutes = now.hour * 60 + now.minute;
+    return nowMinutes >= startMinutes && nowMinutes < endMinutes;
+  }
 
   TeachingSchedule copyWith({
     String? id,
@@ -758,6 +945,14 @@ class TeachingSchedule {
     CycleType? cycle,
     String? teacherName,
     bool? hasJournal,
+    bool? canFillOverride,
+    bool? isFuture,
+    bool? isExpired,
+    bool? isInactiveCycle,
+    String? targetDate,
+    String? targetDateFormatted,
+    String? status,
+    String? statusLabel,
   }) {
     return TeachingSchedule(
       id: id ?? this.id,
@@ -770,6 +965,14 @@ class TeachingSchedule {
       cycle: cycle ?? this.cycle,
       teacherName: teacherName ?? this.teacherName,
       hasJournal: hasJournal ?? this.hasJournal,
+      canFillOverride: canFillOverride ?? this.canFillOverride,
+      isFuture: isFuture ?? this.isFuture,
+      isExpired: isExpired ?? this.isExpired,
+      isInactiveCycle: isInactiveCycle ?? this.isInactiveCycle,
+      targetDate: targetDate ?? this.targetDate,
+      targetDateFormatted: targetDateFormatted ?? this.targetDateFormatted,
+      status: status ?? this.status,
+      statusLabel: statusLabel ?? this.statusLabel,
     );
   }
 
@@ -797,6 +1000,14 @@ class TeachingSchedule {
           : fallbackCycle,
       teacherName: (json['teacher_name'] ?? fallbackTeacher).toString(),
       hasJournal: json['has_journal'] == true,
+      canFillOverride: json['can_fill'] is bool ? json['can_fill'] as bool : null,
+      isFuture: json['is_future'] == true,
+      isExpired: json['is_expired'] == true,
+      isInactiveCycle: json['is_inactive_cycle'] == true,
+      targetDate: json['target_date']?.toString(),
+      targetDateFormatted: json['target_date_formatted']?.toString(),
+      status: json['status']?.toString(),
+      statusLabel: json['status_label']?.toString(),
     );
   }
 }
@@ -853,6 +1064,7 @@ class TeachingJournal {
   final int permissionCount;
   final int sickCount;
   final int absentCount;
+  final List<StudentAttendance> attendances;
 
   const TeachingJournal({
     required this.id,
@@ -872,6 +1084,7 @@ class TeachingJournal {
     this.permissionCount = 0,
     this.sickCount = 0,
     this.absentCount = 0,
+    this.attendances = const [],
   });
 
   factory TeachingJournal.fromJson(
@@ -884,14 +1097,33 @@ class TeachingJournal {
     final sakit = (json['sick_count'] as num?)?.toInt() ?? 0;
     final alpa = (json['absent_count'] as num?)?.toInt() ??
         (total - present - izin - sakit).clamp(0, total);
+    final parsedDate =
+        DateTime.tryParse((json['date'] ?? '').toString()) ?? DateTime.now();
+    final className = (json['classroom_name'] ?? '-').toString();
+    final subjectName = (json['subject_name'] ?? '-').toString();
+    final rawAttendances = json['attendances'];
+    final parsedAttendances = rawAttendances is List
+        ? rawAttendances
+            .whereType<Map<String, dynamic>>()
+            .map(
+              (a) => StudentAttendance.fromJournalAttendanceJson(
+                a,
+                className: className,
+                subjectName: subjectName,
+                teacherName: teacherName,
+                date: parsedDate,
+              ),
+            )
+            .toList()
+        : const <StudentAttendance>[];
     return TeachingJournal(
       id: (json['id'] ?? '').toString(),
       scheduleId: (json['schedule_id'] ?? '').toString(),
-      date: DateTime.tryParse((json['date'] ?? '').toString()) ?? DateTime.now(),
+      date: parsedDate,
       timeSlot: (json['time_slot'] ?? '').toString(),
-      className: (json['classroom_name'] ?? '-').toString(),
+      className: className,
       roomName: (json['room_name'] ?? '-').toString(),
-      subjectName: (json['subject_name'] ?? '-').toString(),
+      subjectName: subjectName,
       teacherName: teacherName,
       topic: (json['teaching_material'] ?? '').toString(),
       notes: json['notes']?.toString(),
@@ -902,6 +1134,7 @@ class TeachingJournal {
       permissionCount: izin,
       sickCount: sakit,
       absentCount: alpa,
+      attendances: parsedAttendances,
     );
   }
 }

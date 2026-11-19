@@ -13,6 +13,9 @@ class VerticalTimelineSchedule extends StatelessWidget {
   final String dayName;
   final String cycleLabel;
   final bool isTeacher;
+  final CycleType? activeCycle;
+  final String? todayDayName;
+  final bool isCurrentCycleActive;
   final void Function(TeachingSchedule schedule)? onActionTap;
   final VoidCallback? onAddTap;
 
@@ -22,6 +25,9 @@ class VerticalTimelineSchedule extends StatelessWidget {
     required this.dayName,
     required this.cycleLabel,
     this.isTeacher = false,
+    this.activeCycle,
+    this.todayDayName,
+    this.isCurrentCycleActive = true,
     this.onActionTap,
     this.onAddTap,
   });
@@ -100,10 +106,47 @@ class VerticalTimelineSchedule extends StatelessWidget {
         final schedule = schedules[index];
         final isLast = index == schedules.length - 1;
 
+        final CycleType resolvedActiveCycle = activeCycle ?? schedule.cycle;
+        final bool isCycleActive =
+            isCurrentCycleActive && schedule.isCycleActive(resolvedActiveCycle);
+        final String resolvedTodayName =
+            (todayDayName != null && todayDayName!.trim().isNotEmpty)
+                ? todayDayName!.trim()
+                : TeachingSchedule.indonesianDayName(DateTime.now());
+        final String effectiveDay =
+            (schedule.day.trim().isNotEmpty && schedule.day.trim() != '-')
+                ? schedule.day.trim()
+                : dayName.trim();
+        final bool isTodayDay =
+            effectiveDay.toLowerCase() == resolvedTodayName.toLowerCase();
+
+        final bool isExpired = !schedule.hasJournal &&
+            isCycleActive &&
+            (schedule.isExpired ||
+                (!isTodayDay &&
+                    schedule
+                        .copyWith(day: effectiveDay)
+                        .isExpiredSchedule()));
+        final bool isFuture = !schedule.hasJournal &&
+            isCycleActive &&
+            !isExpired &&
+            (schedule.isFuture ||
+                !isTodayDay ||
+                schedule.copyWith(day: effectiveDay).isFutureSchedule());
+        final bool canFill = !schedule.hasJournal &&
+            isCycleActive &&
+            !isFuture &&
+            !isExpired &&
+            (schedule.canFillOverride ?? isTodayDay);
+
         // Status node color
         Color nodeColor = AppColors.brandPrimary;
         if (schedule.hasJournal) {
           nodeColor = AppColors.statusSuccess;
+        } else if (!isCycleActive) {
+          nodeColor = AppColors.textTertiary;
+        } else if (isExpired) {
+          nodeColor = AppColors.statusAlpa;
         }
 
         return IntrinsicHeight(
@@ -359,10 +402,15 @@ class VerticalTimelineSchedule extends StatelessWidget {
                           const SizedBox(height: 10),
                           const Divider(height: 1, color: AppColors.border),
                           const SizedBox(height: 8),
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              // Status Jurnal
+                          SizedBox(
+                            width: double.infinity,
+                            child: Wrap(
+                              alignment: WrapAlignment.spaceBetween,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              spacing: 8,
+                              runSpacing: 6,
+                              children: [
+                                // Status Jurnal (Kontras WCAG AA terverifikasi)
                               if (schedule.hasJournal)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -379,32 +427,79 @@ class VerticalTimelineSchedule extends StatelessWidget {
                                       const Icon(
                                         Icons.check_circle_rounded,
                                         size: 13,
-                                        color: AppColors.statusSuccess,
+                                        color: AppColors.statusApprovedText,
                                       ),
                                       const SizedBox(width: 4),
-                                      Text(
-                                        'Jurnal Terisi',
-                                        style: GoogleFonts.plusJakartaSans(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
-                                          color: AppColors.statusApprovedText,
+                                      Flexible(
+                                        child: Text(
+                                          'Jurnal Terisi',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.statusApprovedText,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (isExpired)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.statusRejectedBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.cancel_rounded,
+                                        size: 13,
+                                        color: AppColors.statusRejectedText,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'Tidak Mengisi Jurnal',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.statusRejectedText,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                     ],
                                   ),
                                 )
                               else
-                                Text(
-                                  'Jurnal Belum Diisi',
-                                  style: GoogleFonts.plusJakartaSans(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    color: AppColors.statusWarning,
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.statusPendingBg,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    canFill ? 'Jurnal Belum Diisi' : 'Belum Diisi',
+                                    style: GoogleFonts.plusJakartaSans(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.statusPendingText,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
 
-                              // Tombol Aksi "Isi Jurnal"
-                              if (!schedule.hasJournal && onActionTap != null)
+                              // Kontrol Aksi atau Indikator Tanggal Jadwal (Non-interaktif jika belum waktunya)
+                              if (canFill && onActionTap != null)
                                 Material(
                                   color: Colors.transparent,
                                   child: InkWell(
@@ -413,7 +508,7 @@ class VerticalTimelineSchedule extends StatelessWidget {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(
                                         horizontal: 10,
-                                        vertical: 5,
+                                        vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
                                         color: AppColors.brandPrimary,
@@ -422,15 +517,18 @@ class VerticalTimelineSchedule extends StatelessWidget {
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
-                                          Text(
-                                            'Isi Jurnal',
-                                            style: GoogleFonts.plusJakartaSans(
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.w700,
-                                              color: Colors.white,
+                                          Flexible(
+                                            child: Text(
+                                              'Isi Jurnal',
+                                              style: GoogleFonts.plusJakartaSans(
+                                                fontSize: 11,
+                                                fontWeight: FontWeight.w700,
+                                                color: Colors.white,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
-                                          const SizedBox(width: 2),
+                                          const SizedBox(width: 3),
                                           const Icon(
                                             Icons.arrow_forward_rounded,
                                             size: 13,
@@ -440,8 +538,111 @@ class VerticalTimelineSchedule extends StatelessWidget {
                                       ),
                                     ),
                                   ),
+                                )
+                              else if (!schedule.hasJournal && !isCycleActive)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.lock_clock_rounded,
+                                        size: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'Aktif saat ${schedule.cycle.label}',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (!schedule.hasJournal && isExpired)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.lock_outline_rounded,
+                                        size: 12,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'Waktu Lewat',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else if (!schedule.hasJournal && isFuture)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppColors.border),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.calendar_today_rounded,
+                                        size: 11,
+                                        color: AppColors.textSecondary,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          'Diisi pada ${schedule.copyWith(day: effectiveDay).resolvedTargetDateLabel()}',
+                                          style: GoogleFonts.plusJakartaSans(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w600,
+                                            color: AppColors.textSecondary,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                            ],
+                              ],
+                            ),
                           ),
                         ],
                       ],

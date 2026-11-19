@@ -15,12 +15,14 @@ class GuruJournalInputScreen extends StatefulWidget {
   final AppState state;
   final VoidCallback onBack;
   final VoidCallback onSuccess;
+  final TeachingJournal? editingJournal;
 
   const GuruJournalInputScreen({
     super.key,
     required this.state,
     required this.onBack,
     required this.onSuccess,
+    this.editingJournal,
   });
 
   @override
@@ -36,22 +38,58 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
   String? _activityPhotoName;
   bool _isSubmitting = false;
 
+  TeachingJournal? _activeJournal;
   List<StudentAttendance> _roster = [];
+
+  bool get _isEditMode => widget.editingJournal != null;
 
   @override
   void initState() {
     super.initState();
-    _loadInitialRoster();
+    if (_isEditMode) {
+      final journal = widget.editingJournal!;
+      _activeJournal = journal;
+      _topicController.text = journal.topic;
+      final existingNotes = (journal.notes ?? '').trim();
+      _notesController.text = existingNotes == '-' ? '' : existingNotes;
+      if (journal.attendances.isNotEmpty) {
+        _roster = journal.attendances.map((s) => s.copyWith()).toList();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _loadJournalDetailForEdit();
+      });
+    } else {
+      _loadInitialRoster();
+    }
+  }
+
+  Future<void> _loadJournalDetailForEdit() async {
+    final journal = _activeJournal ?? widget.editingJournal;
+    if (journal == null) return;
+    final detail = await widget.state.fetchTeacherJournalDetailData(journal.id);
+    if (!mounted || detail == null) return;
+    setState(() {
+      _activeJournal = detail;
+      if (detail.attendances.isNotEmpty) {
+        _roster = detail.attendances.map((s) => s.copyWith()).toList();
+      }
+    });
+  }
+
+  TeachingSchedule? _resolveActiveSchedule() {
+    final selected = widget.state.selectedJournalSchedule;
+    if (selected != null) return selected;
+    final unFilled =
+        widget.state.todaySchedules.where((s) => !s.hasJournal).toList();
+    if (unFilled.isNotEmpty) return unFilled.first;
+    if (widget.state.todaySchedules.isNotEmpty) {
+      return widget.state.todaySchedules.first;
+    }
+    return null;
   }
 
   Future<void> _loadInitialRoster() async {
-    final unFilled = widget.state.todaySchedules.where((s) => !s.hasJournal).toList();
-    final sched = widget.state.selectedJournalSchedule ??
-        (unFilled.isNotEmpty
-            ? unFilled.first
-            : (widget.state.todaySchedules.isNotEmpty
-                ? widget.state.todaySchedules.first
-                : null));
+    final sched = _resolveActiveSchedule();
 
     if (sched != null) {
       widget.state.selectScheduleForJournal(sched);
@@ -240,10 +278,44 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    final sched = widget.state.selectedJournalSchedule ??
-        (widget.state.todaySchedules.isNotEmpty
-            ? widget.state.todaySchedules.first
-            : null);
+    if (_isEditMode) {
+      final journal = _activeJournal ?? widget.editingJournal;
+      if (journal == null) return;
+
+      setState(() => _isSubmitting = true);
+
+      final res = await widget.state.updateTeacherJournalData(
+        journalId: journal.id,
+        topic: _topicController.text.trim(),
+        notes: _notesController.text.trim(),
+        roster: _roster,
+        photoFilePath: _pickedPhoto?.path,
+        photoFileName: _pickedPhoto?.name,
+      );
+
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+
+      if (res.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Perubahan jurnal & presensi berhasil disimpan!'),
+            backgroundColor: AppColors.statusHadir,
+          ),
+        );
+        widget.onSuccess();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.message),
+            backgroundColor: AppColors.statusAlpa,
+          ),
+        );
+      }
+      return;
+    }
+
+    final sched = _resolveActiveSchedule();
 
     if (sched == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -259,6 +331,18 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Jurnal untuk jadwal mengajar ini sudah pernah diisi hari ini.'),
+          backgroundColor: AppColors.statusAlpa,
+        ),
+      );
+      return;
+    }
+
+    if (!widget.state.canFillScheduleToday(sched)) {
+      final reason = widget.state.journalIneligibilityReason(sched) ??
+          'Jurnal mengajar hanya dapat diisi pada hari jadwal berlangsung.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(reason),
           backgroundColor: AppColors.statusAlpa,
         ),
       );
@@ -338,10 +422,22 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sched = widget.state.selectedJournalSchedule ??
-        (widget.state.todaySchedules.isNotEmpty
-            ? widget.state.todaySchedules.first
-            : null);
+    final journal = _activeJournal ?? widget.editingJournal;
+    final sched = _isEditMode ? null : _resolveActiveSchedule();
+    final bool canFill = _isEditMode
+        ? (!widget.state.isLoadingJournalDetail && !_isSubmitting)
+        : (sched != null && widget.state.canFillScheduleToday(sched));
+    final String? ineligibilityMessage =
+        (!_isEditMode && sched != null && !sched.hasJournal && !canFill)
+            ? widget.state.journalIneligibilityReason(sched)
+            : null;
+    final String submitButtonLabel = _isEditMode
+        ? 'Simpan Perubahan Jurnal'
+        : (sched != null && sched.hasJournal)
+            ? 'Jurnal Sudah Pernah Diisi'
+            : (sched != null && !canFill)
+                ? 'Jadwal Belum Dapat Diisi'
+                : 'Simpan Jurnal & Presensi Kelas';
 
     final int hadirCount =
         _roster.where((r) => r.status == AttendanceStatus.hadir).length;
@@ -375,24 +471,32 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
           ],
         ),
         child: PrimaryButton(
-          label: (sched != null && sched.hasJournal)
-              ? 'Jurnal Sudah Pernah Diisi'
-              : 'Simpan Jurnal & Presensi Kelas',
-          icon: (sched != null && sched.hasJournal)
-              ? Icons.check_circle_rounded
-              : Icons.check_circle_outline,
+          label: submitButtonLabel,
+          icon: _isEditMode
+              ? Icons.save_rounded
+              : (sched != null && sched.hasJournal)
+                  ? Icons.check_circle_rounded
+                  : (sched != null && !canFill)
+                      ? Icons.lock_clock_rounded
+                      : Icons.check_circle_outline,
           isLoading: _isSubmitting,
-          onPressed: (sched != null && !sched.hasJournal) ? _handleSubmit : null,
+          onPressed: canFill ? _handleSubmit : null,
         ),
       ),
       body: Column(
         children: [
           HeaderWithGradient(
-            userName: 'Input Jurnal & Presensi',
-            userSubtitle: sched != null
-                ? '${sched.className} • ${sched.subjectName}'
-                : 'Pilih Jadwal Mengajar',
-            badgeText: widget.state.currentDateLabel,
+            userName: _isEditMode
+                ? 'Edit Jurnal & Presensi'
+                : 'Input Jurnal & Presensi',
+            userSubtitle: _isEditMode && journal != null
+                ? '${journal.className} • ${journal.subjectName}'
+                : sched != null
+                    ? '${sched.className} • ${sched.subjectName}'
+                    : 'Pilih Jadwal Mengajar',
+            badgeText: _isEditMode && journal != null
+                ? TeachingSchedule.formatShortIndonesianDate(journal.date)
+                : widget.state.currentDateLabel,
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
               onPressed: widget.onBack,
@@ -408,7 +512,52 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Class Summary Header Card
-                    if (sched != null)
+                    if (_isEditMode && journal != null)
+                      SoftCard(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Row(
+                          children: [
+                            Image.asset(
+                              'assets/images/SMK_Negeri_1_Bantul_logo.png',
+                              width: 44,
+                              height: 44,
+                              fit: BoxFit.contain,
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    journal.subjectName,
+                                    style: AppTypography.cardTitle.copyWith(
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '${journal.className} • ${journal.roomName}',
+                                    style: AppTypography.smallHint.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    journal.timeSlot.isNotEmpty
+                                        ? '${TeachingSchedule.formatShortIndonesianDate(journal.date)} • ${journal.timeSlot}'
+                                        : TeachingSchedule.formatShortIndonesianDate(journal.date),
+                                    style: AppTypography.smallHint.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.primaryIndigo,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (sched != null)
                       SoftCard(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: Row(
@@ -502,7 +651,7 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                           children: [
                             const Icon(
                               Icons.check_circle_rounded,
-                              color: AppColors.statusHadir,
+                              color: AppColors.statusApprovedText,
                               size: 18,
                             ),
                             const SizedBox(width: AppSpacing.sm),
@@ -510,7 +659,42 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                               child: Text(
                                 'Jurnal untuk jadwal ini sudah diisi hari ini. Setiap jadwal hanya dapat diisi 1 kali.',
                                 style: AppTypography.caption.copyWith(
-                                  color: AppColors.statusHadir,
+                                  color: AppColors.statusApprovedText,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else if (ineligibilityMessage != null)
+                      Container(
+                        margin: const EdgeInsets.only(top: AppSpacing.sm),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm + 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFFBEB),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: const Color(0xFFFDE68A),
+                          ),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(
+                              Icons.event_busy_rounded,
+                              color: Color(0xFF92400E),
+                              size: 18,
+                            ),
+                            const SizedBox(width: AppSpacing.sm),
+                            Expanded(
+                              child: Text(
+                                ineligibilityMessage,
+                                style: AppTypography.caption.copyWith(
+                                  color: const Color(0xFF92400E),
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -593,12 +777,16 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
 
                     // Camera Photo Activity Attachment (Real-time only)
                     Text(
-                      'Dokumentasi Foto Kegiatan Kelas (Wajib Realtime)',
+                      _isEditMode
+                          ? 'Dokumentasi Foto Kegiatan Kelas'
+                          : 'Dokumentasi Foto Kegiatan Kelas (Wajib Realtime)',
                       style: AppTypography.cardTitle,
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      'Ambil foto dokumentasi kegiatan kelas langsung melalui kamera (real-time). Unggah file galeri dinonaktifkan.',
+                      _isEditMode
+                          ? 'Foto tersimpan akan tetap digunakan jika Anda tidak mengambil foto baru. Ambil ulang langsung dari kamera jika ingin memperbarui.'
+                          : 'Ambil foto dokumentasi kegiatan kelas langsung melalui kamera (real-time). Unggah file galeri dinonaktifkan.',
                       style: AppTypography.caption,
                     ),
                     const SizedBox(height: AppSpacing.xs),
@@ -637,7 +825,9 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'Foto kamera realtime kegiatan terlampir',
+                                    _isEditMode
+                                        ? 'Foto baru siap menggantikan foto sebelumnya'
+                                        : 'Foto kamera realtime kegiatan terlampir',
                                     style: AppTypography.microBadge.copyWith(
                                       color: AppColors.textSecondary,
                                     ),
@@ -657,6 +847,83 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                               }),
                             ),
                           ],
+                        ),
+                      ),
+                    ] else if (_isEditMode &&
+                        journal != null &&
+                        journal.photoUrl != null &&
+                        journal.photoUrl!.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightIndigoBg,
+                          borderRadius: BorderRadius.circular(
+                            AppSpacing.radiusMedium,
+                          ),
+                          border: Border.all(color: AppColors.lightIndigoBorder),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.check_circle_outline_rounded,
+                              color: AppColors.primaryIndigo,
+                              size: 24,
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Foto dokumentasi tersimpan',
+                                    style: AppTypography.smallHint.copyWith(
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.brandNavy,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Tetap digunakan kecuali Anda mengambil foto baru.',
+                                    style: AppTypography.microBadge.copyWith(
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(
+                              color: AppColors.primaryIndigo,
+                              width: 1.5,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(
+                                AppSpacing.radiusMedium,
+                              ),
+                            ),
+                          ),
+                          icon: const Icon(
+                            Icons.camera_alt_rounded,
+                            color: AppColors.primaryIndigo,
+                            size: 20,
+                          ),
+                          label: Text(
+                            'Ambil Ulang Foto (Kamera Realtime)',
+                            style: AppTypography.labelButton.copyWith(
+                              color: AppColors.primaryIndigo,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          onPressed: () => _pickPhoto(ImageSource.camera),
                         ),
                       ),
                     ] else ...[
@@ -782,7 +1049,22 @@ class _GuruJournalInputScreenState extends State<GuruJournalInputScreen> {
                     const SizedBox(height: AppSpacing.md),
 
                     // Student Roster
-                    if (widget.state.isLoadingRoster && _roster.isEmpty)
+                    if (_isEditMode &&
+                        widget.state.isLoadingJournalDetail &&
+                        _roster.isEmpty)
+                      const DataLoadingCard(
+                        message: 'Memuat detail jurnal & presensi siswa...',
+                      )
+                    else if (_isEditMode &&
+                        widget.state.journalDetailError != null &&
+                        _roster.isEmpty)
+                      DataErrorCard(
+                        message: widget.state.journalDetailError!,
+                        onRetry: _loadJournalDetailForEdit,
+                      )
+                    else if (!_isEditMode &&
+                        widget.state.isLoadingRoster &&
+                        _roster.isEmpty)
                       const DataLoadingCard(
                         message: 'Memuat daftar siswa dari server...',
                       )

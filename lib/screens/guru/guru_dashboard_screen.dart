@@ -288,7 +288,15 @@ class GuruDashboardScreen extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  onPressed: () => onNavigate('guru_journal_input'),
+                                  onPressed: () {
+                                    final match = state.todaySchedules
+                                        .where((s) => s.id == alert.scheduleId)
+                                        .firstOrNull;
+                                    if (match != null) {
+                                      state.selectScheduleForJournal(match);
+                                    }
+                                    onNavigate('guru_journal_input');
+                                  },
                                   icon: const Icon(Icons.edit_note_rounded, size: 19),
                                   label: Text(
                                     'Isi Jurnal Sekarang',
@@ -324,7 +332,15 @@ class GuruDashboardScreen extends StatelessWidget {
                         iconColor: AppColors.secondaryTeal,
                         bgColor: AppColors.lightTealBg,
                         badge: unfilledCount > 0 ? '$unfilledCount' : null,
-                        onTap: () => onNavigate('guru_journal_input'),
+                        onTap: () {
+                          final unfilled = activeSchedules
+                              .where((s) => !s.hasJournal)
+                              .firstOrNull;
+                          if (unfilled != null) {
+                            state.selectScheduleForJournal(unfilled);
+                          }
+                          onNavigate('guru_journal_input');
+                        },
                       ),
                       MenuItemData(
                         label: 'Riwayat Jurnal',
@@ -424,8 +440,9 @@ class GuruDashboardScreen extends StatelessWidget {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 24),
                           child: Text(
-                            'Tidak ada jadwal mengajar pada siklus ini.',
+                            'Tidak ada jadwal mengajar untuk Anda hari ini (${state.activeCycle.label}).',
                             style: AppTypography.smallHint,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
@@ -601,8 +618,10 @@ class GuruDashboardScreen extends StatelessWidget {
                                                 BorderRadius.circular(11),
                                           ),
                                         ),
-                                        onPressed: () =>
-                                            onNavigate('guru_journal_input'),
+                                        onPressed: () {
+                                          state.selectScheduleForJournal(s);
+                                          onNavigate('guru_journal_input');
+                                        },
                                         icon: const Icon(
                                           Icons.edit_note_rounded,
                                           size: 18,

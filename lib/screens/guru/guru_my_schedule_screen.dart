@@ -291,6 +291,7 @@ class _GuruMyScheduleScreenState extends State<GuruMyScheduleScreen> {
                   // Horizontal Date Strip (Interaktif & Modern)
                   HorizontalDateStrip(
                     selectedDay: _selectedDay,
+                    todayDayName: widget.state.todayDayName,
                     onDaySelected: (day) => setState(() => _selectedDay = day),
                   ),
 
@@ -300,17 +301,31 @@ class _GuruMyScheduleScreenState extends State<GuruMyScheduleScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Jadwal Hari $_selectedDay', style: AppTypography.sectionTitle),
+                      Expanded(
+                        child: Text(
+                          'Jadwal Hari $_selectedDay',
+                          style: AppTypography.sectionTitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       Row(
                         children: [
                           // Tombol Uji Notifikasi 15 Menit (Demo UKK)
                           InkWell(
-                            onTap: () => widget.state.triggerTestClassEndingNotification(
-                              context: context,
-                              onNavigateToJournal: widget.onFillJournal != null && schedules.isNotEmpty
-                                  ? () => widget.onFillJournal!(schedules.first)
-                                  : null,
-                            ),
+                            onTap: () {
+                              final fillableToday = widget.state.todaySchedules
+                                  .where((s) => widget.state.canFillScheduleToday(s))
+                                  .firstOrNull;
+                              widget.state.triggerTestClassEndingNotification(
+                                context: context,
+                                onNavigateToJournal: widget.onFillJournal != null &&
+                                        fillableToday != null
+                                    ? () => widget.onFillJournal!(fillableToday)
+                                    : null,
+                              );
+                            },
                             borderRadius: BorderRadius.circular(20),
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -370,7 +385,26 @@ class _GuruMyScheduleScreenState extends State<GuruMyScheduleScreen> {
                     dayName: _selectedDay,
                     cycleLabel: currentCycle.label,
                     isTeacher: true,
-                    onActionTap: widget.onFillJournal,
+                    activeCycle: widget.state.activeCycle,
+                    todayDayName: widget.state.todayDayName,
+                    isCurrentCycleActive: isCurrentSystemActive,
+                    onActionTap: widget.onFillJournal != null
+                        ? (schedule) {
+                            if (!widget.state.canFillScheduleToday(schedule)) {
+                              final msg =
+                                  widget.state.journalIneligibilityReason(schedule) ??
+                                      'Jurnal hanya dapat diisi pada hari jadwal berlangsung.';
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(msg),
+                                  backgroundColor: AppColors.statusAlpa,
+                                ),
+                              );
+                              return;
+                            }
+                            widget.onFillJournal!(schedule);
+                          }
+                        : null,
                     onAddTap: (widget.onAddSchedule == null || widget.state.isScheduleLocked)
                         ? null
                         : widget.onAddSchedule,

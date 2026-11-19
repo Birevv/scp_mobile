@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:scp_mobile/models/models.dart';
+import 'package:scp_mobile/screens/guru/guru_dashboard_screen.dart';
+import 'package:scp_mobile/screens/guru/guru_journal_input_screen.dart';
+import 'package:scp_mobile/screens/guru/guru_my_schedule_screen.dart';
 import 'package:scp_mobile/screens/wali/wali_dashboard_screen.dart';
 import 'package:scp_mobile/state/app_state.dart';
 
@@ -155,5 +158,185 @@ void main() {
 
     expect(navigatedRoute, equals('guru_journal_input'));
     expect(state.selectedJournalSchedule?.id, equals('202'));
+  });
+
+  testWidgets(
+      'GuruMyScheduleScreen blocks future days, past days, and inactive cycles from journal submission',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final todaySched = TeachingSchedule(
+      id: '301',
+      subjectName: 'Basis Data Hari Ini',
+      className: 'XII RPL 1',
+      roomName: 'Lab 1',
+      day: TeachingSchedule.indonesianDayName(DateTime.now()),
+      startTime: '07:15',
+      endTime: '09:15',
+      cycle: CycleType.putaran1,
+      teacherName: 'Budi Santoso, S.Kom',
+      hasJournal: false,
+      canFillOverride: true,
+    );
+
+    final futureSched = TeachingSchedule(
+      id: '302',
+      subjectName: 'Pemrograman Web Mendatang',
+      className: 'XII RPL 1',
+      roomName: 'Lab 2',
+      day: 'Jumat',
+      startTime: '09:30',
+      endTime: '11:30',
+      cycle: CycleType.putaran1,
+      teacherName: 'Budi Santoso, S.Kom',
+      hasJournal: false,
+      canFillOverride: false,
+      isFuture: true,
+      targetDateFormatted: '20 Nov 2026',
+    );
+
+    final state = AppState.forTesting(
+      user: const UserProfile(
+        id: '2',
+        name: 'Budi Santoso, S.Kom',
+        email: 'budi@scp.sch.id',
+        role: UserRole.guru,
+        identifier: '198501012010011001',
+        className: 'Guru Produktif RPL',
+        avatarUrl: '',
+      ),
+      teachingSchedules: [todaySched, futureSched],
+    );
+
+    TeachingSchedule? filledSchedule;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GuruMyScheduleScreen(
+          state: state,
+          onFillJournal: (sched) {
+            filledSchedule = sched;
+          },
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Tap Jumat tab (future schedule)
+    await tester.tap(find.text('Jumat'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Pemrograman Web Mendatang'), findsOneWidget);
+    expect(find.text('Diisi pada 20 Nov 2026'), findsOneWidget);
+    expect(find.text('Isi Jurnal'), findsNothing);
+    expect(filledSchedule, isNull);
+  });
+
+  testWidgets(
+      'GuruJournalInputScreen and AppState reject future or inactive-cycle schedules',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    const futureSchedule = TeachingSchedule(
+      id: '401',
+      subjectName: 'Rekayasa Perangkat Lunak Besok',
+      className: 'XII RPL 2',
+      roomName: 'Lab RPL',
+      day: 'Jumat',
+      startTime: '07:15',
+      endTime: '09:15',
+      cycle: CycleType.putaran1,
+      teacherName: 'Budi Santoso, S.Kom',
+      hasJournal: false,
+      canFillOverride: false,
+      isFuture: true,
+      targetDateFormatted: '20 Nov 2026',
+    );
+
+    final state = AppState.forTesting(
+      user: const UserProfile(
+        id: '2',
+        name: 'Budi Santoso, S.Kom',
+        email: 'budi@scp.sch.id',
+        role: UserRole.guru,
+        identifier: '198501012010011001',
+        className: 'Guru Produktif RPL',
+        avatarUrl: '',
+      ),
+      teachingSchedules: [futureSchedule],
+    );
+    state.selectScheduleForJournal(futureSchedule);
+
+    expect(state.canFillScheduleToday(futureSchedule), isFalse);
+
+    final submitRes = await state.submitTeacherJournalData(
+      scheduleId: futureSchedule.id,
+      topic: 'Materi Masa Depan',
+      notes: '-',
+      roster: const [],
+    );
+    expect(submitRes.success, isFalse);
+    expect(submitRes.statusCode, equals(422));
+    expect(submitRes.message, contains('belum berlangsung'));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GuruJournalInputScreen(
+          state: state,
+          onBack: () {},
+          onSuccess: () {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Jadwal Belum Dapat Diisi'), findsOneWidget);
+    expect(find.textContaining('belum berlangsung'), findsOneWidget);
+
+    final elevatedBtn = tester.widget<ElevatedButton>(
+      find.ancestor(
+        of: find.text('Jadwal Belum Dapat Diisi'),
+        matching: find.byType(ElevatedButton),
+      ),
+    );
+    expect(elevatedBtn.onPressed, isNull);
+  });
+
+  testWidgets(
+      'GuruDashboardScreen shows empty today message when todaySchedules is empty',
+      (WidgetTester tester) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    final state = AppState.forTesting(
+      user: const UserProfile(
+        id: '2',
+        name: 'Budi Santoso, S.Kom',
+        email: 'budi@scp.sch.id',
+        role: UserRole.guru,
+        identifier: '198501012010011001',
+        className: 'Guru Produktif RPL',
+        avatarUrl: '',
+      ),
+      teachingSchedules: const [],
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: GuruDashboardScreen(
+          state: state,
+          onNavigate: (_) {},
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(
+      find.text('Tidak ada jadwal mengajar untuk Anda hari ini (Putaran 1).'),
+      findsOneWidget,
+    );
+    expect(find.text('Isi Jurnal & Presensi Kelas'), findsNothing);
   });
 }

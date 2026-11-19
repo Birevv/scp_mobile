@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../../constants/app_colors.dart';
@@ -12,24 +13,64 @@ import '../../widgets/cards/attendance_donut_card.dart';
 import '../../widgets/cards/data_state_view.dart';
 import '../../widgets/menu_grid.dart';
 
-class SiswaDashboardScreen extends StatelessWidget {
+class SiswaDashboardScreen extends StatefulWidget {
   final AppState state;
   final Function(String routeName) onNavigate;
+  final DateTime Function()? clock;
 
   const SiswaDashboardScreen({
     super.key,
     required this.state,
     required this.onNavigate,
+    this.clock,
   });
 
   @override
+  State<SiswaDashboardScreen> createState() => _SiswaDashboardScreenState();
+}
+
+class _SiswaDashboardScreenState extends State<SiswaDashboardScreen> {
+  late DateTime _now;
+  Timer? _clockTimer;
+
+  DateTime _resolveNow() => widget.clock?.call() ?? DateTime.now();
+
+  @override
+  void initState() {
+    super.initState();
+    _now = _resolveNow();
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted) return;
+      final latest = _resolveNow();
+      if (latest.minute != _now.minute ||
+          latest.hour != _now.hour ||
+          latest.day != _now.day) {
+        setState(() {
+          _now = latest;
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final state = widget.state;
+    final onNavigate = widget.onNavigate;
     final user = state.currentUser;
     final summary = state.studentSummary;
     final todaySchedules = state.todaySchedules;
     final pendingRequests = state.leaveRequests
         .where((r) => r.status == LeaveStatus.pending)
         .toList();
+    final TeachingSchedule? ongoingSchedule = state.todayEvent.disableKbm
+        ? null
+        : todaySchedules.where((s) => s.isOngoingAt(_now)).firstOrNull;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -234,6 +275,45 @@ class SiswaDashboardScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.sm),
 
+                    if (ongoingSchedule != null) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 9,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.lightTealBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.secondaryTeal.withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.schedule_rounded,
+                              size: 16,
+                              color: AppColors.secondaryTeal,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Jam aktif sekarang: ${ongoingSchedule.startTime} - ${ongoingSchedule.endTime} WIB (${ongoingSchedule.subjectName})',
+                                style: AppTypography.caption.copyWith(
+                                  color: AppColors.statusApprovedText,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.sm),
+                    ],
+
                     if (state.isLoadingDashboard && todaySchedules.isEmpty)
                       const DataLoadingCard(
                         message: 'Memuat jadwal hari ini...',
@@ -260,7 +340,7 @@ class SiswaDashboardScreen extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final s = todaySchedules[index];
                           final bool isOngoing =
-                              index == 0 && !state.todayEvent.disableKbm;
+                              !state.todayEvent.disableKbm && s.isOngoingAt(_now);
 
                           return SoftCard(
                             padding: const EdgeInsets.all(AppSpacing.lg),

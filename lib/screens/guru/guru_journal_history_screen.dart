@@ -6,15 +6,18 @@ import '../../models/models.dart';
 import '../../state/app_state.dart';
 import '../../widgets/headers/header_with_gradient.dart';
 import '../../widgets/cards/soft_card.dart';
+import '../../widgets/cards/data_state_view.dart';
 
 class GuruJournalHistoryScreen extends StatefulWidget {
   final AppState state;
   final VoidCallback? onBack;
+  final void Function(TeachingJournal journal)? onEditJournal;
 
   const GuruJournalHistoryScreen({
     super.key,
     required this.state,
     this.onBack,
+    this.onEditJournal,
   });
 
   @override
@@ -312,14 +315,24 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                   Text('Daftar Jurnal Terisi', style: AppTypography.sectionTitle),
                   const SizedBox(height: AppSpacing.sm),
 
-                  if (journals.isEmpty) ...[
+                  if (widget.state.isLoadingJournals && journals.isEmpty) ...[
+                    const DataLoadingCard(
+                      message: 'Memuat riwayat jurnal mengajar...',
+                    ),
+                  ] else if (widget.state.journalsError != null && journals.isEmpty) ...[
+                    DataErrorCard(
+                      message: widget.state.journalsError!,
+                      onRetry: () => _reloadJournals(),
+                    ),
+                  ] else if (journals.isEmpty) ...[
                     SoftCard(
                       child: Center(
                         child: Padding(
                           padding: const EdgeInsets.symmetric(vertical: 36),
                           child: Text(
-                            'Belum ada riwayat jurnal yang disimpan.',
+                            'Belum ada riwayat jurnal pada bulan dan putaran yang dipilih.',
                             style: AppTypography.smallHint,
+                            textAlign: TextAlign.center,
                           ),
                         ),
                       ),
@@ -372,13 +385,14 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                                             color: AppColors.textSecondary,
                                           ),
                                         ),
-                                        Text(
-                                          j.timeSlot,
-                                          style: AppTypography.microBadge.copyWith(
-                                            color: AppColors.primaryBlue,
-                                            fontWeight: FontWeight.w700,
+                                        if (j.timeSlot.isNotEmpty)
+                                          Text(
+                                            j.timeSlot,
+                                            style: AppTypography.microBadge.copyWith(
+                                              color: AppColors.primaryBlue,
+                                              fontWeight: FontWeight.w700,
+                                            ),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -426,7 +440,7 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                                   _buildTag('Alpa: ${j.absentCount}', AppColors.alertRedBg, AppColors.errorAlpa),
                                 ],
                               ),
-                              if (j.photoUrl != null) ...[
+                              if (j.photoUrl != null && j.photoUrl!.isNotEmpty) ...[
                                 const SizedBox(height: AppSpacing.sm),
                                 Row(
                                   children: [
@@ -434,7 +448,7 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
-                                        'Foto dokumentasi: ${j.photoUrl}',
+                                        'Foto dokumentasi terlampir',
                                         style: AppTypography.microBadge.copyWith(
                                           color: AppColors.teamTeal,
                                         ),
@@ -442,6 +456,37 @@ class _GuruJournalHistoryScreenState extends State<GuruJournalHistoryScreen> {
                                       ),
                                     ),
                                   ],
+                                ),
+                              ],
+                              if (widget.onEditJournal != null) ...[
+                                const SizedBox(height: AppSpacing.md),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 44,
+                                  child: OutlinedButton.icon(
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: AppColors.primaryIndigo,
+                                      side: const BorderSide(
+                                        color: AppColors.primaryIndigo,
+                                        width: 1.2,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppSpacing.radiusMedium,
+                                        ),
+                                      ),
+                                    ),
+                                    onPressed: () => widget.onEditJournal!(j),
+                                    icon: const Icon(Icons.edit_outlined, size: 18),
+                                    label: Text(
+                                      'Edit Jurnal',
+                                      style: AppTypography.labelButton.copyWith(
+                                        color: AppColors.primaryIndigo,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w700,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                               ],
                             ],

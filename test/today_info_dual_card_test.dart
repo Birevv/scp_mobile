@@ -11,7 +11,7 @@ void main() {
   });
   group('TodayInfoCard Dual Card Widget Tests', () {
     testWidgets(
-        'Renders left clock card with Jakarta and WIB real-time clock',
+        'Renders left clock card with Yogyakarta and WIB real-time clock',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         MaterialApp(
@@ -27,8 +27,8 @@ void main() {
       );
       await tester.pump();
 
-      // Memastikan Sisi Kiri menampilkan jam digital & zona waktu
-      expect(find.text('Jakarta'), findsOneWidget);
+      // Memastikan Sisi Kiri menampilkan jam digital & zona waktu Yogyakarta
+      expect(find.text('Yogyakarta'), findsOneWidget);
       expect(find.text('Waktu Standar WIB'), findsOneWidget);
       expect(find.text('Putaran 1'), findsOneWidget);
     });

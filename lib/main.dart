@@ -104,6 +104,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
   String _currentRoute = 'splash';
   bool _splashCompleted = false;
   LeaveRequest? _selectedLeaveDetail;
+  TeachingJournal? _selectedJournalToEdit;
   final List<String> _routeHistory = [];
 
   @override
@@ -167,12 +168,29 @@ class _ScpMainShellState extends State<ScpMainShell> {
 
   void _navigateBack() {
     setState(() {
+      if (_currentRoute == 'guru_journal_edit') {
+        _selectedJournalToEdit = null;
+        widget.state.selectJournalForEdit(null);
+      }
       if (_routeHistory.isNotEmpty) {
         _currentRoute = _routeHistory.removeLast();
       } else {
         _currentRoute = _getDefaultDashboardForRole(widget.state.currentRole);
       }
     });
+  }
+
+  bool _shouldInterceptBack() {
+    if (!_splashCompleted) return false;
+    if (!widget.state.isAuthenticated) return false;
+    final role = widget.state.currentRole;
+    if (role == UserRole.unsupported) return false;
+    if (_currentRoute == 'splash' ||
+        _currentRoute == 'login' ||
+        _currentRoute == 'unsupported') {
+      return false;
+    }
+    return _currentRoute != _getDefaultDashboardForRole(role);
   }
 
   List<AppBottomNavItem> _getNavItemsForRole(UserRole role) {
@@ -316,6 +334,9 @@ class _ScpMainShellState extends State<ScpMainShell> {
       case UserRole.unsupported:
         break;
     }
+    if (index == 0) {
+      _routeHistory.clear();
+    }
   }
 
   Widget _buildCurrentScreen() {
@@ -409,6 +430,7 @@ class _ScpMainShellState extends State<ScpMainShell> {
           onBack: _routeHistory.isNotEmpty ? _navigateBack : null,
           onAddSchedule: null,
           onFillJournal: (schedule) {
+            if (!widget.state.canFillScheduleToday(schedule)) return;
             widget.state.selectScheduleForJournal(schedule);
             _navigateTo('guru_journal_input');
           },
@@ -421,10 +443,48 @@ class _ScpMainShellState extends State<ScpMainShell> {
           onSuccess: () => _navigateTo('guru_journal_history'),
         );
 
+      case 'guru_journal_edit':
+        final targetJournal =
+            _selectedJournalToEdit ?? widget.state.editingJournal;
+        if (targetJournal == null) {
+          return GuruJournalHistoryScreen(
+            state: widget.state,
+            onBack: _routeHistory.isNotEmpty ? _navigateBack : null,
+            onEditJournal: (journal) {
+              setState(() {
+                _selectedJournalToEdit = journal;
+              });
+              widget.state.selectJournalForEdit(journal);
+              _navigateTo('guru_journal_edit');
+            },
+          );
+        }
+        return GuruJournalInputScreen(
+          state: widget.state,
+          editingJournal: targetJournal,
+          onBack: () {
+            setState(() => _selectedJournalToEdit = null);
+            widget.state.selectJournalForEdit(null);
+            _navigateBack();
+          },
+          onSuccess: () {
+            setState(() => _selectedJournalToEdit = null);
+            widget.state.selectJournalForEdit(null);
+            _navigateBack();
+          },
+        );
+
       case 'guru_journal_history':
         return GuruJournalHistoryScreen(
           state: widget.state,
           onBack: _routeHistory.isNotEmpty ? _navigateBack : null,
+          onEditJournal: (journal) {
+            setState(() {
+              _selectedJournalToEdit = journal;
+            });
+            widget.state.selectJournalForEdit(journal);
+            _navigateTo('guru_journal_edit');
+          },
         );
 
       // Wali Kelas & Guru BK screens
@@ -522,21 +582,33 @@ class _ScpMainShellState extends State<ScpMainShell> {
         _currentRoute != 'login' &&
         _currentRoute != 'unsupported';
 
-    return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: KeyedSubtree(
-          key: ValueKey(_currentRoute),
-          child: _buildCurrentScreen(),
+    return PopScope(
+      canPop: !_shouldInterceptBack(),
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentRoute == 'siswa_leave_request') {
+          // SiswaLeaveRequestScreen has its own PopScope for unsaved-data confirmation
+          // and invokes widget.onBack (_navigateBack) when confirmed.
+          return;
+        }
+        _navigateBack();
+      },
+      child: Scaffold(
+        body: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 300),
+          child: KeyedSubtree(
+            key: ValueKey(_currentRoute),
+            child: _buildCurrentScreen(),
+          ),
         ),
+        bottomNavigationBar: showBottomNav
+            ? AppBottomNavBar(
+                currentIndex: activeTabIndex,
+                items: _getNavItemsForRole(currentRole),
+                onIndexChanged: (idx) => _onTabSelected(idx, currentRole),
+              )
+            : null,
       ),
-      bottomNavigationBar: showBottomNav
-          ? AppBottomNavBar(
-              currentIndex: activeTabIndex,
-              items: _getNavItemsForRole(currentRole),
-              onIndexChanged: (idx) => _onTabSelected(idx, currentRole),
-            )
-          : null,
     );
   }
 }

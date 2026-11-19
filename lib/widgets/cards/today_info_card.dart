@@ -19,6 +19,7 @@ class TodayInfoCard extends StatefulWidget {
   final List<AcademicEventInfo>? calendarEvents;
   final AcademicEventInfo? upcomingEvent;
   final VoidCallback? onTapCalendarStatus;
+  final String locationName;
 
   const TodayInfoCard({
     super.key,
@@ -28,6 +29,7 @@ class TodayInfoCard extends StatefulWidget {
     this.calendarEvents,
     this.upcomingEvent,
     this.onTapCalendarStatus,
+    this.locationName = 'Yogyakarta',
   });
 
   @override
@@ -313,7 +315,7 @@ class _TodayInfoCardState extends State<TodayInfoCard> {
             children: [
               Expanded(
                 child: Text(
-                  'Jakarta',
+                  widget.locationName,
                   style: GoogleFonts.plusJakartaSans(
                     fontSize: 12.5,
                     fontWeight: FontWeight.w700,

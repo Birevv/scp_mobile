@@ -268,6 +268,7 @@ class _SiswaScheduleScreenState extends State<SiswaScheduleScreen> {
                   // Horizontal Date Strip (Interaktif & Modern)
                   HorizontalDateStrip(
                     selectedDay: _selectedDay,
+                    todayDayName: widget.state.todayDayName,
                     onDaySelected: (day) => setState(() => _selectedDay = day),
                   ),
 
